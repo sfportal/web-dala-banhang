@@ -14,7 +14,11 @@ export async function thuchiConfig(env) {
 async function call(env, path, opts = {}) {
   const { base, key } = await thuchiConfig(env);
   if (!base || !key) throw new HttpError(503, 'Chưa kết nối web thu chi SePay');
-  const r = await fetch(`${base}/api/v1${path}`, {
+  // Worker gọi Worker khác cùng tài khoản qua *.workers.dev bị Cloudflare trả 404 (lỗi 1042),
+  // nên khi có service binding THUCHI thì gọi thẳng qua binding.
+  const viaBinding = env.THUCHI && /\.workers\.dev$/i.test(new URL(base).hostname);
+  const doFetch = viaBinding ? (u, o) => env.THUCHI.fetch(u, o) : fetch;
+  const r = await doFetch(`${base}/api/v1${path}`, {
     ...opts,
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', accept: 'application/json' },
   });
