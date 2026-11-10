@@ -54,12 +54,16 @@ Repo có sẵn hai quy trình GitHub Actions:
 
 ### Cài đặt một lần
 
-1. Tạo cơ sở dữ liệu: `npx wrangler d1 create dala-shop` và ghi lại `database_id`.
-2. Tạo Cloudflare API token (mẫu "Edit Cloudflare Workers", thêm quyền D1 Edit).
-3. Trong GitHub, vào **Settings → Secrets and variables → Actions**:
-   - Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ADMIN_PASSWORD`, `APP_SECRET` (chuỗi ngẫu nhiên, ít nhất 32 ký tự).
-   - Variables: `D1_DATABASE_ID` (bắt buộc), `SITE_URL` (ví dụ `https://dala.vn`).
-4. Merge vào `main`. Sau lần deploy đầu, gắn tên miền cho Worker trong Cloudflare.
+Cơ sở dữ liệu D1 `dala-shop` đã được tạo, ID của nó đã ghi sẵn trong `wrangler.jsonc`.
+
+1. Tạo Cloudflare API token theo mẫu "Edit Cloudflare Workers" và thêm quyền **D1 Edit**.
+2. Trong GitHub, vào **Settings → Secrets and variables → Actions** và thêm 2 secret: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+3. Chạy lại workflow **Deploy**, hoặc merge vào `main`.
+
+Các mục không bắt buộc:
+- Secret `ADMIN_PASSWORD` để tạo tài khoản `admin` lần đầu.
+- Secret `APP_SECRET`. Nếu không đặt, hệ thống tự sinh và lưu trong D1.
+- Biến `SITE_URL` cho tên miền riêng.
 
 ### Kết nối thanh toán và giao hàng (trong trang quản trị)
 
