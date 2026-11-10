@@ -1,0 +1,133 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../../layouts/Store.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import { loadCatalog } from '../../lib/catalog.js';
+import { getSettings, first } from '../../lib/db.js';
+import { LINE_LABEL } from '../../lib/content.js';
+
+const { slug } = Astro.params;
+const [cat, s] = await Promise.all([loadCatalog(env), getSettings(env)]);
+const p = cat.products.find((x) => x.slug === slug);
+if (!p) return Astro.redirect('/san-pham', 302);
+const site = (env.SITE_URL || Astro.url.origin).replace(/\/$/, '');
+const vnd = (n) => Number(n || 0).toLocaleString('vi-VN') + 'đ';
+const full = p.line === 'qua';
+const lot = await first(env, 'SELECT code FROM lots WHERE product_id=? ORDER BY id DESC LIMIT 1', p.id);
+const inCombos = cat.products.filter((x) => x.components?.some((c) => c.sku === p.sku));
+const related = cat.products.filter((x) => x.id !== p.id && (x.line === p.line || x.personas?.some((y) => p.personas?.includes(y)))).slice(0, 4);
+const free = s.shipping?.free_threshold || 0;
+const imgs = [p.image, p.image_bg && p.image_bg !== p.image ? p.image_bg : null].filter(Boolean);
+const ld = {
+  '@context': 'https://schema.org', '@type': 'Product', name: `${p.name} ${p.subtitle || ''}`.trim(), sku: p.sku, image: imgs.map((i) => site + i), description: p.short_desc,
+  brand: { '@type': 'Brand', name: 'DaLa' }, category: LINE_LABEL[p.line],
+  offers: { '@type': 'Offer', url: `${site}/san-pham/${p.slug}`, priceCurrency: 'VND', price: p.effective_price, availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    itemCondition: 'https://schema.org/NewCondition', ...(p.flash ? { priceValidUntil: p.flash.ends_at.slice(0, 10) } : {}),
+    shippingDetails: { '@type': 'OfferShippingDetails', shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'VN' } } },
+};
+const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+  { '@type': 'ListItem', position: 1, name: 'Trang chủ', item: site + '/' }, { '@type': 'ListItem', position: 2, name: 'Sản phẩm', item: site + '/san-pham' },
+  { '@type': 'ListItem', position: 3, name: p.name, item: `${site}/san-pham/${p.slug}` }] };
+const maxQty = Math.max(1, Math.min(p.stock, 20));
+---
+<Store title={p.seo_title || `${p.name} ${p.subtitle} | DaLa`} description={p.seo_desc || p.short_desc} image={p.image_bg || p.image} path={`/san-pham/${p.slug}`} jsonld={[ld, crumbs]} active="products">
+  <div class="container" data-product-id={p.id}>
+    <nav class="crumbs"><a href="/">Trang chủ</a> / <a href="/san-pham">Sản phẩm</a> / <span>{p.name}</span></nav>
+    <div class="pdp">
+      <div class="gallery">
+        <div class:list={['main-img', { full }]} id="mainImg"><img src={imgs[0]} alt={`${p.name} ${p.subtitle}`} width="900" height="900" fetchpriority="high" /></div>
+        {imgs.length > 1 && <div class="thumbs">{imgs.map((src, i) => <button class:list={[{ on: i === 0 }]} data-src={src} aria-label={`Ảnh ${i + 1}`}><img src={src} alt="" /></button>)}</div>}
+      </div>
+      <div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">{(p.badges || []).map((b) => <span class:list={['badge', p.line === 'chanhleo' ? 'purple' : 'green']}>{b}</span>)}</div>
+        <h1>{p.name}</h1>
+        <div class="sub">{p.subtitle}</div>
+        <p>{p.short_desc}</p>
+        {p.flash && (
+          <div class="flash-box" data-flash-wrap>
+            <div><b>⚡ Flash Sale</b> · {p.flash.left != null ? `còn ${p.flash.left} suất` : 'số lượng có hạn'}, tối đa {p.flash.per_order}/đơn</div>
+            <div class="countdown mini" data-countdown={p.flash.ends_at}></div>
+          </div>
+        )}
+        <div class="price-box">
+          <span class:list={['price', { red: !!p.flash }]}>{vnd(p.effective_price)}</span>
+          {p.ref_price && <s class="muted" style="font-size:1.1rem">{vnd(p.ref_price)}</s>}
+          {p.save_pct > 0 && <span class="badge red">−{p.save_pct}%</span>}
+        </div>
+        {p.kind === 'addon' && <div class="note-box">Khoai lang sấy dẻo là món <b>bán kèm</b>: thêm vào cùng bất kỳ sản phẩm nào khác, hoặc chọn <a href="/san-pham/combo-khoe-moi-ngay">Combo khỏe mỗi ngày</a>.</div>}
+        {p.kind === 'b2b' && <div class="note-box">Chủ quán trà, cà phê: giá sỉ {vnd(p.wholesale_price || 115000)}/chai từ 1 thùng. <a href="/lien-he?chu-de=b2b">Gửi yêu cầu báo giá</a> hoặc đăng ký làm đại lý.</div>}
+        <div class="actions" data-buy-anchor>
+          {p.stock > 0 ? (
+            <Fragment>
+              <div class="qty"><button type="button" data-step="-1" aria-label="Giảm">−</button><span id="pq">1</span><button type="button" data-step="1" aria-label="Tăng">+</button></div>
+              <button class="btn" data-add={p.sku} data-qty-from="#pq" data-pid={p.id} data-img={full ? p.image : p.image.replace('.webp', '-sm.webp')}>Thêm vào giỏ</button>
+              <button class="btn sun" data-add={p.sku} data-qty-from="#pq" data-buy-now data-pid={p.id}>Mua ngay <span class="shine"></span></button>
+            </Fragment>
+          ) : <button class="btn" disabled>Tạm hết hàng</button>}
+        </div>
+        <div class="perks">
+          <div><b>🚚</b>{free ? `Freeship từ ${(free / 1000).toLocaleString('vi-VN')}k` : 'Giao toàn quốc'}</div>
+          <div><b>💳</b>QR tự xác nhận hoặc COD</div>
+          <div><b>📱</b>QR xem vườn trồng</div>
+        </div>
+        {(p.tiktok_url || p.shopee_url) && <div class="channels">Cũng có trên: {p.tiktok_url && <a href={p.tiktok_url} target="_blank" rel="noopener" data-channel="tiktok">TikTok Shop</a>}{p.shopee_url && <a href={p.shopee_url} target="_blank" rel="noopener" data-channel="shopee">Shopee</a>}</div>}
+
+        <div class="tabs" role="tablist">
+          <button class="on" data-tab="story">Câu chuyện</button>
+          {p.components && <button data-tab="combo">Trong combo có gì</button>}
+          <button data-tab="use">Cách dùng</button>
+          <button data-tab="ing">Thành phần & truy xuất</button>
+          <button data-tab="ship">Giao hàng</button>
+        </div>
+        <div class="tab-pane on" data-pane="story">
+          <p>{p.story}</p>
+          <ul class="ticks">{(p.benefits || []).map((b) => <li>{b}</li>)}</ul>
+        </div>
+        {p.components && (
+          <div class="tab-pane" data-pane="combo">
+            <div class="components">{p.components.map((c) => <a href={`/san-pham/${cat.products.find((x) => x.sku === c.sku)?.slug || ''}`}><img src={(c.image || '').replace('.webp', '-sm.webp')} alt="" /><div><b>{c.name}</b><div class="muted" style="font-size:.85rem">{c.subtitle}</div></div><span>× {c.qty}</span></a>)}</div>
+            {p.ref_price && <p class="note-box" style="margin-top:12px">Mua lẻ {vnd(p.ref_price)}, mua combo chỉ {vnd(p.effective_price)}: tiết kiệm {vnd(p.ref_price - p.effective_price)}.</p>}
+          </div>
+        )}
+        <div class="tab-pane" data-pane="use"><p>{p.usage}</p></div>
+        <div class="tab-pane" data-pane="ing">
+          <p><b>Thành phần:</b> {p.ingredients}</p>
+          <p><b>Quy cách:</b> {p.weight}</p>
+          <p>Mỗi gói có mã QR lô hàng ở mặt trước. {lot && <Fragment>Xem thử lô gần nhất: <a href={`/lo/${lot.code}`}>{lot.code}</a>.</Fragment>}</p>
+          <p class="muted" style="font-size:.88rem">Sản phẩm là thực phẩm, không phải thuốc và không có tác dụng thay thế thuốc chữa bệnh.</p>
+        </div>
+        <div class="tab-pane" data-pane="ship">
+          <p>Phí giao hàng tính tự động theo địa chỉ, khối lượng (~{(p.weight_g / 1000).toLocaleString('vi-VN')}kg) và kích thước kiện ({p.length_cm}×{p.width_cm}×{p.height_cm}cm) qua các hãng vận chuyển trên Goship.{p.fragile ? ' Sản phẩm thuộc nhóm hàng dễ vỡ: DaLa đóng gói chống sốc và ghi chú cho hãng vận chuyển.' : ''}</p>
+          {free > 0 && <p>Miễn phí giao hàng cho đơn từ {vnd(free)}.</p>}
+          <p>Thanh toán: chuyển khoản VietQR (tự xác nhận) hoặc trả tiền khi nhận hàng. Đổi trả trong 7 ngày nếu sản phẩm lỗi do vận chuyển hoặc sản xuất.</p>
+        </div>
+      </div>
+    </div>
+
+    {inCombos.length > 0 && (
+      <section style="margin:30px 0">
+        <h2 style="font-size:1.6rem">Mua trong combo, lợi hơn</h2>
+        <div class="grid">{inCombos.map((x, i) => <ProductCard p={x} delay={i * 0.05} />)}</div>
+      </section>
+    )}
+    {related.length > 0 && (
+      <section style="margin:40px 0 20px">
+        <h2 style="font-size:1.6rem">Có thể bạn cũng thích</h2>
+        <div class="grid">{related.map((x, i) => <ProductCard p={x} delay={i * 0.05} />)}</div>
+      </section>
+    )}
+  </div>
+  {p.stock > 0 && (
+    <div class="mobile-buy">
+      <div style="flex:1"><div style="font-size:.8rem" class="muted">{p.name}</div><div class:list={['price', { red: !!p.flash }]} style="font-size:1.15rem">{vnd(p.effective_price)}</div></div>
+      <button class="btn sm" data-add={p.sku} data-qty-from="#pq" data-pid={p.id} data-img={full ? p.image : p.image.replace('.webp', '-sm.webp')}>Thêm giỏ</button>
+      <button class="btn sm sun" data-add={p.sku} data-qty-from="#pq" data-buy-now data-pid={p.id}>Mua ngay</button>
+    </div>
+  )}
+  <script is:inline slot="scripts" set:html={`
+    (function(){var max=${maxQty};var q=document.getElementById('pq');
+    document.querySelectorAll('[data-step]').forEach(function(b){b.onclick=function(){if(!q)return;q.textContent=Math.min(max,Math.max(1,(+q.textContent||1)+(+b.dataset.step)))}});
+    document.querySelectorAll('[data-tab]').forEach(function(b){b.onclick=function(){document.querySelectorAll('[data-tab]').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('[data-pane]').forEach(function(x){x.classList.toggle('on',x.dataset.pane===b.dataset.tab)})}});
+    document.querySelectorAll('.thumbs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.thumbs button').forEach(function(x){x.classList.toggle('on',x===b)});var m=document.getElementById('mainImg');m.innerHTML='<img src="'+b.dataset.src+'" alt="">';m.classList.toggle('full',b.dataset.src.indexOf('-bg')>0)}});})();
+  `}></script>
+</Store>

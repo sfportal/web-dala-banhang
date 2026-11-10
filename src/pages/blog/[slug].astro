@@ -1,0 +1,22 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../../layouts/Store.astro';
+import { first } from '../../lib/db.js';
+const p = await first(env, 'SELECT * FROM posts WHERE slug=? AND published=1', Astro.params.slug);
+if (!p) return Astro.redirect('/blog', 302);
+const site = (env.SITE_URL || Astro.url.origin).replace(/\/$/, '');
+const ld = { '@context': 'https://schema.org', '@type': 'Article', headline: p.title, description: p.excerpt, image: p.cover ? site + p.cover : undefined, datePublished: p.created_at?.replace(' ', 'T') + 'Z', author: { '@type': 'Organization', name: 'DaLa' }, publisher: { '@type': 'Organization', name: 'HTX DaLa', logo: { '@type': 'ImageObject', url: site + '/assets/img/logo.png' } } };
+const paras = String(p.body || '').split(/\n{2,}/).filter(Boolean);
+---
+<Store title={p.seo_title || `${p.title} | DaLa`} description={p.seo_desc || p.excerpt} image={p.cover} path={`/blog/${p.slug}`} jsonld={[ld]}>
+  <article class="section" style="padding-top:30px"><div class="container">
+    <div class="prose">
+      <nav class="crumbs"><a href="/">Trang chủ</a> / <a href="/blog">Góc dinh dưỡng</a></nav>
+      <h1 style="font-size:clamp(2rem,4.5vw,3rem)">{p.title}</h1>
+      <p class="lead">{p.excerpt}</p>
+      {p.cover && <div class="post-cover"><img src={p.cover} alt="" /></div>}
+      {paras.map((x) => <p>{x}</p>)}
+      <div class="panel" style="margin-top:30px"><b>Thử sản phẩm DaLa</b><p class="muted">Không đường thêm, QR truy xuất từng lô. Nhập CHAOBAN giảm 10% đơn đầu.</p><a class="btn sun sm" href="/san-pham">Xem sản phẩm</a></div>
+    </div>
+  </div></article>
+</Store>

@@ -1,0 +1,10 @@
+---
+import Store from '../../layouts/Store.astro';
+const { code } = Astro.params;
+---
+<Store title={`Đơn hàng ${code} | DaLa`} noindex path={`/don-hang/${code}`}>
+  <div class="container order-wrap" id="order" data-code={code}>
+    <div class="panel" style="text-align:center"><p class="muted">Đang tải đơn hàng…</p></div>
+  </div>
+  <script is:inline slot="scripts" src="/assets/js/order.js?v=1" defer></script>
+</Store>

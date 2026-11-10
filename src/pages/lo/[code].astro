@@ -1,0 +1,43 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../../layouts/Store.astro';
+import { getLot } from '../../server/api.js';
+const code = String(Astro.params.code || '').toUpperCase();
+const lot = await getLot(env, code, true);
+const d = (s) => (s ? new Date(s).toLocaleDateString('vi-VN') : '—');
+const vnd = (n) => Number(n || 0).toLocaleString('vi-VN') + 'đ';
+if (!lot) Astro.response.status = 404;
+---
+<Store title={lot ? `Lô ${lot.code} · ${lot.product_name} | DaLa` : 'Không tìm thấy mã lô | DaLa'} description={lot ? `Nguồn gốc lô ${lot.code}: ${lot.farm}, thu hái ${d(lot.harvest_date)}, chế biến ${d(lot.process_date)}.` : ''} noindex active="qr">
+  {lot ? (
+    <Fragment>
+      <div class="lot-hero"><div class="container" style="position:relative;z-index:1">
+        <div class="eyebrow" style="color:#ffd35c">Lô hàng {lot.code}</div>
+        <h1 style="font-size:clamp(1.9rem,5vw,3rem);color:#fff;max-width:16ch">{lot.product_name}</h1>
+        <p style="opacity:.85">{lot.product_subtitle}</p>
+      </div></div>
+      <div class="container" style="max-width:760px">
+        <div class="lot-card" data-reveal>
+          <div class="lot-steps">
+            <div><i>🌱</i><div><b>Vườn trồng</b><div class="muted">{lot.farm} · {lot.region}</div><div class="muted" style="font-size:.85rem">{lot.farmer}{lot.farm_code ? ` · Mã vùng trồng ${lot.farm_code}` : ''}</div></div></div>
+            <div><i>🧺</i><div><b>Thu hái</b><div class="muted">{d(lot.harvest_date)}</div></div></div>
+            <div><i>🏭</i><div><b>Chế biến, đóng gói</b><div class="muted">{d(lot.process_date)}</div></div></div>
+            <div><i>🧪</i><div><b>Kiểm nghiệm</b><div class="muted">{lot.lab_summary || 'Đang cập nhật'}</div>{lot.lab_url && <a href={lot.lab_url} target="_blank" rel="noopener">Xem phiếu kiểm nghiệm</a>}</div></div>
+            <div style="border:0"><i>📅</i><div><b>Hạn sử dụng</b><div class="muted">{d(lot.expiry_date)}</div></div></div>
+          </div>
+          {lot.video_url && <p><a class="btn ghost sm" href={lot.video_url} target="_blank" rel="noopener">▶ Xem video vườn</a></p>}
+          {lot.note && <p class="muted">{lot.note}</p>}
+        </div>
+        <div class="panel" style="margin-top:20px;display:grid;grid-template-columns:110px 1fr;gap:16px;align-items:center" data-reveal>
+          <img src={(lot.product_image || '').replace('.webp', '-sm.webp')} alt="" style="background:var(--cream-2);border-radius:18px;padding:6px" />
+          <div><b>Thích lô này? Mua lại với giá {vnd(lot.product_price)}</b><div class="muted" style="font-size:.9rem;margin:4px 0 10px">Hoặc nhập mã CHAOBAN để giảm 10% đơn đầu tiên.</div>
+            <a class="btn sun sm" href={`/san-pham/${lot.product_slug}`}>Mua lại</a> <a class="btn ghost sm" href="/lien-he">Góp ý cho DaLa</a></div>
+        </div>
+        <p class="muted" style="font-size:.8rem;text-align:center;margin:20px 0 40px">Dữ liệu vùng trồng đồng bộ từ FarmBase. Lượt quét lô này: {lot.scans + 1}.</p>
+      </div>
+      <script is:inline slot="scripts" set:html={`setTimeout(function(){window.dalaTrack&&dalaTrack('qr_scan',{campaign:${JSON.stringify(lot.code)},product_id:${lot.product_id || 'null'}})},300)`}></script>
+    </Fragment>
+  ) : (
+    <section class="section"><div class="container" style="text-align:center"><div style="font-size:3rem">🔍</div><h1 style="font-size:2rem">Không tìm thấy mã lô {code}</h1><p class="muted">Kiểm tra lại mã in cạnh QR trên bao bì, hoặc liên hệ DaLa để được hỗ trợ.</p><a class="btn" href="/truy-xuat">Tra cứu lại</a></div></section>
+  )}
+</Store>

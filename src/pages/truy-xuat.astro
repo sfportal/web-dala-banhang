@@ -1,0 +1,23 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../layouts/Store.astro';
+import { all } from '../lib/db.js';
+const ma = Astro.url.searchParams.get('ma');
+if (ma) return Astro.redirect(`/lo/${encodeURIComponent(ma.trim().toUpperCase())}`, 302);
+const lots = await all(env, 'SELECT l.code, p.name, p.subtitle FROM lots l LEFT JOIN products p ON p.id=l.product_id ORDER BY l.id DESC LIMIT 6');
+---
+<Store title="Tra cứu mã lô QR | DaLa" description="Nhập mã lô in trên bao bì DaLa để xem vườn trồng, nông hộ, ngày thu hái, ngày chế biến và kết quả kiểm nghiệm." active="qr" path="/truy-xuat">
+  <section class="section" style="padding-top:40px">
+    <div class="container qr-demo">
+      <div data-reveal>
+        <div class="eyebrow">Quét QR, thấy vườn</div>
+        <h1 style="font-size:clamp(2rem,4.5vw,3.4rem)">Tra cứu nguồn gốc từng lô hàng</h1>
+        <p class="lead">Mã lô in cạnh QR ở mặt trước bao bì (ví dụ DL-CL-2611A). Quét QR bằng camera điện thoại hoặc nhập mã bên dưới.</p>
+        <form class="lot-form" method="get"><input name="ma" placeholder="Nhập mã lô" required aria-label="Mã lô" /><button class="btn">Tra cứu</button></form>
+        {lots.length > 0 && <p class="muted" style="margin-top:18px;font-size:.9rem">Lô mẫu: {lots.map((l, i) => <Fragment>{i ? ', ' : ''}<a href={`/lo/${l.code}`}>{l.code}</a></Fragment>)}</p>}
+      </div>
+      <div data-reveal="right"><div class="phone"><div class="screen"><div class="scan"></div><div class="bar"><small>Quét mã trên bao bì</small><b>Vườn · Kiểm nghiệm · Nhà máy</b></div>
+        <div class="line"><span>🌱 Vườn</span><b>Mã số vùng trồng</b></div><div class="line"><span>🧪 Kiểm nghiệm</span><b>Theo từng lô</b></div><div class="line"><span>🏭 Chế biến</span><b>Ngày, mẻ sấy</b></div><div class="line"><span>📦 Hạn dùng</span><b>Rõ ràng</b></div></div></div></div>
+    </div>
+  </section>
+</Store>

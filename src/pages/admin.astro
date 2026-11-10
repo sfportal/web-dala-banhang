@@ -1,0 +1,44 @@
+---
+// Trang quản trị (SPA): CRM, CSM, đơn đa kênh, CTV, ví hoa hồng, SEO, analytics
+---
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Quản trị DaLa</title>
+  <link rel="icon" href="/assets/img/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/admin.css?v=1" />
+</head>
+<body>
+  <div id="login" class="login" hidden>
+    <form class="login-card" id="loginForm">
+      <img src="/assets/img/logo.webp" alt="DaLa" width="140" height="56" />
+      <h1>Quản trị DaLa</h1>
+      <label>Tên đăng nhập<input id="lu" autocomplete="username" value="admin" required /></label>
+      <label>Mật khẩu<input id="lp" type="password" autocomplete="current-password" required /></label>
+      <button class="btn">Đăng nhập</button>
+      <p class="muted small">Lần đầu: tài khoản <b>admin</b>, mật khẩu là biến môi trường ADMIN_PASSWORD (mặc định dala12345, đổi ngay sau khi vào).</p>
+    </form>
+  </div>
+  <div id="app" class="app" hidden>
+    <aside class="side" id="side">
+      <a class="brand" href="#/"><img src="/assets/img/logo.webp" alt="DaLa" width="96" height="38" /><span>Quản trị</span></a>
+      <nav id="nav"></nav>
+      <div class="side-foot"><a href="/" target="_blank">↗ Xem website</a><button id="logout" class="link">Đăng xuất</button></div>
+    </aside>
+    <main class="main">
+      <header class="top"><button class="menu" id="menu" aria-label="Menu">☰</button><h1 id="title">Tổng quan</h1><div class="top-r" id="topR"></div><span class="who" id="who"></span></header>
+      <div id="banner"></div>
+      <section id="view" class="view"></section>
+    </main>
+  </div>
+  <div class="drawer-bg" id="drawerBg" hidden><div class="drawer" id="drawer" role="dialog" aria-modal="true"></div></div>
+  <div class="toasts" id="toasts"></div>
+  <script src="/assets/js/admin.js?v=1" defer></script>
+</body>
+</html>

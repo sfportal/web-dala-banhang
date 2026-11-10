@@ -1,0 +1,24 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../layouts/Store.astro';
+import { getSettings } from '../lib/db.js';
+const s = await getSettings(env);
+const free = s.shipping?.free_threshold || 0;
+const aff = s.affiliate || {};
+---
+<Store title="Chính sách mua hàng DaLa: giao hàng, đổi trả, thanh toán, bảo mật" description="Chính sách giao hàng toàn quốc qua Goship, đổi trả 7 ngày, thanh toán QR hoặc COD và bảo mật thông tin khách hàng của DaLa." path="/chinh-sach" settings={s}>
+  <section class="section" style="padding-top:40px"><div class="container prose">
+    <h1 style="font-size:2.4rem">Chính sách mua hàng</h1>
+    <h2 id="giao-hang" style="font-size:1.5rem;margin-top:30px">Giao hàng</h2>
+    <p>DaLa giao hàng toàn quốc qua các hãng vận chuyển kết nối với Goship (GHN, GHTK, Viettel Post, J&T, Best Express…). Phí giao hàng được tính tự động ở bước thanh toán theo địa chỉ nhận, khối lượng và kích thước kiện hàng; khách chọn hãng và thời gian giao phù hợp.</p>
+    <p>Hàng dễ vỡ (chai cốt chanh leo, hộp quà, chanh leo sấy giòn, trái tươi) được đóng gói chống sốc, có phụ phí đóng gói nhỏ và ghi chú "hàng dễ vỡ" cho hãng vận chuyển.{free ? ` Đơn từ ${free.toLocaleString('vi-VN')}đ được miễn phí giao hàng.` : ''}</p>
+    <h2 id="doi-tra" style="font-size:1.5rem;margin-top:30px">Đổi trả</h2>
+    <p>Đổi mới hoặc hoàn tiền trong 7 ngày nếu sản phẩm bị lỗi do sản xuất, hư hỏng khi vận chuyển, sai sản phẩm. Vui lòng quay video khi mở hàng và gửi qua trang <a href="/lien-he?chu-de=doi-tra">Liên hệ</a> kèm mã đơn. Trái tươi được hỗ trợ trong 48 giờ kể từ khi nhận.</p>
+    <h2 id="thanh-toan" style="font-size:1.5rem;margin-top:30px">Thanh toán</h2>
+    <p>Chuyển khoản qua mã VietQR: hệ thống nhận biến động số dư qua SePay và xác nhận đơn tự động. Đơn chưa thanh toán sẽ tự huỷ sau thời gian giữ chỗ để hoàn lại suất Flash Sale cho khách khác. Hoặc trả tiền mặt khi nhận hàng (COD).</p>
+    <h2 id="ctv" style="font-size:1.5rem;margin-top:30px">Cộng tác viên</h2>
+    <p>Hoa hồng được ghi nhận khi khách mua qua link hoặc mã của cộng tác viên (link có hiệu lực {aff.cookie_days || 30} ngày; khách đã mua sẽ gắn với cộng tác viên cho các đơn sau). Hoa hồng chuyển sang khả dụng sau {aff.hold_days ?? 7} ngày kể từ khi đơn hoàn tất, rút tối thiểu {(aff.min_withdraw || 0).toLocaleString('vi-VN')}đ, chi trả {aff.payout_days || 'định kỳ'}. Cộng tác viên không được quảng cáo sản phẩm có tác dụng chữa bệnh.</p>
+    <h2 id="bao-mat" style="font-size:1.5rem;margin-top:30px">Bảo mật</h2>
+    <p>Thông tin họ tên, số điện thoại, địa chỉ chỉ dùng để giao hàng, chăm sóc sau bán và chương trình cộng tác viên; không bán hay chia sẻ cho bên thứ ba ngoài hãng vận chuyển và cổng thanh toán. Khách có thể yêu cầu xoá dữ liệu qua trang Liên hệ.</p>
+  </div></section>
+</Store>

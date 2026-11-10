@@ -1,0 +1,35 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../layouts/Store.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { loadCatalog } from '../lib/catalog.js';
+const cat = await loadCatalog(env);
+const items = cat.products.filter((p) => p.flash);
+const others = cat.products.filter((p) => !p.flash && p.kind !== 'addon').slice(0, 4);
+---
+<Store title="Flash Sale DaLa: giá sốc, số suất có hạn" description="Flash Sale trái cây Tây Nguyên chế biến lành mạnh: bột chuối xanh, chanh leo sấy thăng hoa, combo. Số suất có hạn, đếm ngược theo thời gian thực." active="flash" path="/flash-sale">
+  <section class="section" style="padding-top:30px">
+    <div class="container">
+      <div class="flash" data-reveal="zoom">
+        {cat.flash ? (
+          <Fragment>
+            <div class="flash-head">
+              <div class="flash-title"><div class="bolt"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></div>
+                <div><h1 style="font-size:clamp(1.8rem,4vw,3rem);margin:0">Flash Sale</h1><div style="opacity:.85">{cat.flash.name} · mỗi khách tối đa vài suất, hết suất về giá thường</div></div></div>
+              <div><div style="font-size:.8rem;opacity:.8;margin-bottom:6px;text-align:right">Kết thúc sau</div><div class="countdown" data-countdown={cat.flash.ends_at}></div></div>
+            </div>
+            <div class="grid">{items.map((p, i) => <ProductCard p={p} delay={i * 0.06} />)}</div>
+          </Fragment>
+        ) : (
+          <div style="text-align:center;padding:30px 0">
+            <div class="bolt" style="margin:0 auto 16px"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></div>
+            <h1 style="font-size:2rem">{cat.next_flash ? 'Flash Sale sắp bắt đầu' : 'Chưa có Flash Sale'}</h1>
+            {cat.next_flash ? <div style="display:flex;justify-content:center"><div class="countdown" data-countdown={cat.next_flash.starts_at}></div></div> : <p style="opacity:.85">Theo dõi DaLa trên TikTok, Zalo để nhận thông báo đợt sale tiếp theo.</p>}
+          </div>
+        )}
+      </div>
+      <h2 style="margin-top:50px;font-size:1.8rem">Sản phẩm khác</h2>
+      <div class="grid">{others.map((p, i) => <ProductCard p={p} delay={i * 0.05} />)}</div>
+    </div>
+  </section>
+</Store>

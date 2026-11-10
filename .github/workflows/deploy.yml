@@ -1,0 +1,52 @@
+name: Deploy
+
+# Tự triển khai lên Cloudflare Workers khi merge vào main.
+# Cần trong Settings → Secrets and variables → Actions:
+#   Secrets:   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ADMIN_PASSWORD, APP_SECRET
+#   Variables: D1_DATABASE_ID (ID in ra khi chạy: npx wrangler d1 create dala-shop), SITE_URL (không bắt buộc)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kiểm tra cấu hình
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "${{ vars.D1_DATABASE_ID }}" ]; then
+            echo "::error::Thiếu CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID hoặc biến D1_DATABASE_ID. Xem README mục Triển khai."
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Gắn ID cơ sở dữ liệu D1 và tên miền
+        run: |
+          sed -i 's/00000000-0000-0000-0000-000000000000/${{ vars.D1_DATABASE_ID }}/' wrangler.jsonc
+          if [ -n "${{ vars.SITE_URL }}" ]; then sed -i 's#"SITE_URL": "[^"]*"#"SITE_URL": "${{ vars.SITE_URL }}"#' wrangler.jsonc; fi
+      - name: Áp migration D1
+        run: npx wrangler d1 migrations apply dala-shop --remote
+      - run: npm run build
+      - name: Deploy Worker
+        run: npx wrangler deploy
+      - name: Cập nhật secret của Worker
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+        run: |
+          [ -n "$ADMIN_PASSWORD" ] && printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD || echo "Bỏ qua ADMIN_PASSWORD"
+          [ -n "$APP_SECRET" ] && printf '%s' "$APP_SECRET" | npx wrangler secret put APP_SECRET || echo "Bỏ qua APP_SECRET"
