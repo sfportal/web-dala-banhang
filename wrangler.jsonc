@@ -7,6 +7,7 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "dala-shop", "database_id": "f0ae287f-6093-4236-9d04-6c7d33e0ed6e", "migrations_dir": "migrations" }
   ],
+  "services": [{ "binding": "THUCHI", "service": "sepay-thuchi" }],
   "triggers": { "crons": ["*/5 * * * *"] },
   "vars": { "SITE_URL": "https://dala.vn" }
 }
