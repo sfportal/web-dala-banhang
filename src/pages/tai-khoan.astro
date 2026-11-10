@@ -10,8 +10,8 @@ const s = await getSettings(env);
       <div class="acc-guest">
         <div>
           <span class="eyebrow">Tài khoản DaLa</span>
-          <h1>Đơn hàng của bạn, <span class="serif">ở một chỗ</span></h1>
-          <p class="lead">Đặt hàng không cần đăng nhập. Tạo tài khoản bằng đúng số điện thoại đã mua để xem lại mọi đơn, theo dõi giao hàng và đăng ký làm cộng tác viên.</p>
+          <h1>Đơn hàng, điểm và ưu đãi <span class="serif">ở một chỗ</span></h1>
+          <p class="lead">Đặt hàng không cần đăng nhập. Tạo tài khoản bằng đúng số điện thoại đã mua để xem lại mọi đơn, dùng điểm tích luỹ, nhận mã khuyến mãi và đăng ký làm cộng tác viên.</p>
         </div>
         <div class="panel auth" id="accAuth"></div>
       </div>
@@ -29,6 +29,8 @@ const s = await getSettings(env);
           <div id="accOrders"><p class="muted">Đang tải…</p></div>
         </div>
         <aside>
+          <div class="panel points-card" id="accPoints" hidden></div>
+          <div class="panel" id="accPromos" hidden></div>
           <div class="panel" id="accCtv"></div>
           <form class="panel" id="accProfile" novalidate>
             <h3>Thông tin nhận hàng</h3>
@@ -47,5 +49,5 @@ const s = await getSettings(env);
     </section>
   </div>
   <script is:inline slot="scripts" src="/assets/js/auth.js?v=1" defer></script>
-  <script is:inline slot="scripts" src="/assets/js/account.js?v=1" defer></script>
+  <script is:inline slot="scripts" src="/assets/js/account.js?v=2" defer></script>
 </Store>

@@ -20,6 +20,8 @@ Website bán lẻ cho DaLa ("Nắng cao nguyên, quét QR thấy vườn"), xây
 - Đặt hàng không cần đăng nhập. Khách tạo tài khoản bằng số điện thoại và mật khẩu.
 - Tạo tài khoản bằng số đã từng mua sẽ thấy lại các đơn cũ cùng số. Chưa xác thực SĐT thì chỉ xem tóm tắt đơn (ẩn địa chỉ).
 - Quên mật khẩu bằng mã OTP; trang thanh toán tự điền thông tin khi đã đăng nhập.
+- Điểm tích luỹ theo SĐT: cộng khi đơn hoàn tất, thu hồi khi hoàn hàng; khách đăng nhập đổi điểm giảm tiền hàng lúc thanh toán (hoàn điểm khi huỷ đơn). Mặc định 10.000đ = 1 điểm, 1 điểm = 200đ, tối đa 30% tiền hàng.
+- Mục Khuyến mãi: mã giảm giá đang chạy (bật "Hiện trong tài khoản khách") và Flash Sale.
 
 **Cộng tác viên (`/ctv`)**
 - Đăng ký từ tài khoản khách: họ tên theo CCCD, ngày sinh, số CCCD, địa chỉ, ngân hàng, mã số thuế cá nhân, xác nhận đã đọc chính sách (lưu phiên bản và thời điểm đồng ý).
@@ -109,6 +111,7 @@ Vào **Cài đặt → SEO & đo lường** để nhập GA4, Meta Pixel, TikTok
   - Tạo ở trạng thái *chờ* khi đơn được thanh toán (QR) hoặc khi đặt COD.
   - Khi đơn hoàn tất, sau `hold_days` ngày sẽ chuyển sang *khả dụng*.
   - Huỷ nếu đơn huỷ hoặc hoàn hàng.
+- **CTV tự mua** (SĐT người mua trùng SĐT CTV): mặc định tính hoa hồng trực tiếp, không cộng giảm giá mã CTV; đổi trong Cài đặt → Cộng tác viên.
 - **Hạng CTV**: xét theo doanh số trực tiếp lấy mức cao hơn giữa tháng này và tháng trước. Quản trị có thể khoá hạng.
 - **Flash sale**: phần vượt suất hoặc vượt giới hạn mỗi đơn tính giá thường. Đơn huỷ được trả lại suất và tồn kho.
 - **Combo**: tồn kho tính theo thành phần, bán combo sẽ trừ kho thành phần.

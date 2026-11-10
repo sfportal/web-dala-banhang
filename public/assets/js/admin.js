@@ -426,7 +426,7 @@
       { h: 'Mã', f: (v) => `<b>${esc(v.code)}</b>` }, { h: 'Loại', f: (v) => T[v.type] }, { h: 'Giá trị', f: (v) => (v.type === 'pct' ? v.value + '%' + (v.max_discount ? ` (tối đa ${vnd(v.max_discount)})` : '') : v.type === 'fixed' ? vnd(v.value) : '—') },
       { h: 'Đơn tối thiểu', num: 1, f: (v) => vnd(v.min_order) }, { h: 'Đã dùng', num: 1, f: (v) => `${v.used}${v.usage_limit ? '/' + v.usage_limit : ''}` },
       { h: 'Điều kiện', f: (v) => `${v.first_order_only ? 'Đơn đầu · ' : ''}${v.ends_at ? 'đến ' + dd(v.ends_at) : ''}` }, { h: 'Ghi chú', k: 'note' },
-      { h: '', f: (v) => (v.active ? '<span class="badge b-green">Bật</span>' : '<span class="badge b-gray">Tắt</span>') },
+      { h: '', f: (v) => (v.active ? '<span class="badge b-green">Bật</span>' : '<span class="badge b-gray">Tắt</span>') + (v.public === 0 ? ' <span class="badge b-gray">Ẩn với khách</span>' : '') },
     ], rows, { click: 1 })}</div><p class="muted small">Mã CTV cũng nhập được ở ô mã giảm giá khi thanh toán (giảm theo cài đặt cộng tác viên).</p>`;
     bindRows(el, rows, (v) => voucherForm(v));
     $('#newV').addEventListener('click', () => voucherForm({ type: 'pct', active: 1 }));
@@ -436,7 +436,7 @@
       { k: 'code', l: 'Mã', s: 2, ro: !!v.code }, { k: 'type', l: 'Loại', t: 'select', s: 2, o: [['pct', 'Giảm %'], ['fixed', 'Giảm tiền'], ['freeship', 'Miễn phí ship']] }, { k: 'value', l: 'Giá trị (% hoặc đ)', t: 'number', s: 2 },
       { k: 'min_order', l: 'Đơn tối thiểu', t: 'number', s: 2 }, { k: 'max_discount', l: 'Giảm tối đa', t: 'number', s: 2 }, { k: 'usage_limit', l: 'Giới hạn lượt', t: 'number', s: 2 },
       { k: 'starts_at', l: 'Bắt đầu', t: 'datetime', s: 3 }, { k: 'ends_at', l: 'Kết thúc', t: 'datetime', s: 3 },
-      { k: 'first_order_only', l: 'Chỉ đơn đầu tiên', t: 'check', s: 3 }, { k: 'active', l: 'Bật', t: 'check', s: 3 }, { k: 'note', l: 'Mô tả' },
+      { k: 'first_order_only', l: 'Chỉ đơn đầu tiên', t: 'check', s: 2 }, { k: 'active', l: 'Bật', t: 'check', s: 2 }, { k: 'public', l: 'Hiện trong tài khoản khách', t: 'check', s: 2, get: (x) => x.public !== 0 }, { k: 'note', l: 'Mô tả' },
     ], v)}<div class="actions"><button class="btn" id="saveV">Lưu</button>${v.code ? '<button class="btn red" id="delV">Xoá</button>' : ''}</div></div>`);
     $('#saveV', d).addEventListener('click', (e) => act(e.target, async () => {
       const b = readForm(d); ['starts_at', 'ends_at'].forEach((k) => (b[k] = b[k] ? new Date(b[k]).toISOString() : null));
@@ -483,6 +483,8 @@
         <dt>Nhóm</dt><dd><b>${esc(c.segment)}</b></dd><dt>Số đơn · tổng chi</dt><dd>${c.orders_count} · ${vnd(c.total_spent)}</dd>
         <dt>Mua lần đầu</dt><dd>${dd(c.first_order_at)}</dd><dt>Gần nhất</dt><dd>${dd(c.last_order_at)}</dd>
         <dt>CTV gắn</dt><dd>${c.aff_code ? `${esc(c.aff_name)} (${esc(c.aff_code)})` : '—'}</dd>
+        <dt>Tài khoản</dt><dd>${c.registered_at ? `Có từ ${dd(c.registered_at)}${c.phone_verified ? ' · <span class="badge b-green">SĐT đã xác thực</span>' : ''}` : 'Chưa tạo'}</dd>
+        <dt>Điểm tích luỹ</dt><dd><b>${num(c.points || 0)}</b> điểm</dd>
         <dt>Hay mua</dt><dd>${c.favorites.map((f) => `${esc(f.name.split(' · ')[0])} ×${f.qty}`).join(', ') || '—'}</dd>
       </dl></div>
       <div class="card">${form([
@@ -493,8 +495,13 @@
         <div class="form"><div class="f s4"><textarea id="note" rows="2" placeholder="Nội dung cuộc gọi, phản hồi của khách…"></textarea></div><div class="f s2"><button class="btn sm" id="addN">+ Ghi chú</button></div>
         <div class="f s3"><input id="tTitle" placeholder="Việc cần làm, VD: gọi tư vấn combo" /></div><div class="f s2"><input id="tDue" type="datetime-local" /></div><div class="f s1"><button class="btn ghost sm" id="addT">+ Việc</button></div></div>
       </div>
+      <div class="card"><h3>Điểm tích luỹ</h3>
+        <div class="form"><div class="f s1"><input id="ptN" type="number" placeholder="+50 / -20" /></div><div class="f s4"><input id="ptNote" placeholder="Lý do (VD: bù lỗi giao hàng)" /></div><div class="f s1"><button class="btn ghost sm" id="ptB">Điều chỉnh</button></div></div>
+        ${table([{ h: 'Lúc', f: (x) => dt(x.created_at) }, { h: 'Nội dung', f: (x) => esc(x.note || x.type) + (x.created_by && x.created_by !== 'system' ? ` <span class="muted small">(${esc(x.created_by)})</span>` : '') }, { h: 'Điểm', num: 1, f: (x) => (x.points > 0 ? '+' : '') + num(x.points) }], c.points_history || [])}
+      </div>
       <div class="card"><h3>Lịch sử</h3><ul class="timeline">${tl.map((x) => `<li><span class="muted small">${dt(x.t)}</span><br>${x.h}</li>`).join('') || '<li>Chưa có hoạt động</li>'}</ul></div>`);
     $('#saveC', d).addEventListener('click', (e) => act(e.target, async () => { await api('/customers/' + id, { method: 'PUT', body: readForm($('.card .form', d)) }); toast('Đã lưu'); reload && reload(); }));
+    $('#ptB', d).addEventListener('click', (e) => act(e.target, async () => { await api(`/customers/${id}/points`, { method: 'POST', body: { points: Number($('#ptN', d).value), note: $('#ptNote', d).value } }); toast('Đã điều chỉnh điểm'); customerDetail(id, reload); }));
     $('#addN', d).addEventListener('click', (e) => act(e.target, async () => { await api(`/customers/${id}/notes`, { method: 'POST', body: { body: $('#note', d).value } }); customerDetail(id, reload); }));
     $('#addT', d).addEventListener('click', (e) => act(e.target, async () => { const due = $('#tDue', d).value; await api('/tasks', { method: 'POST', body: { customer_id: id, title: $('#tTitle', d).value, type: 'callback', due_at: due ? new Date(due).toISOString() : null } }); toast('Đã thêm việc'); customerDetail(id, reload); }));
   }
@@ -718,7 +725,7 @@
   // ================================================================ Cài đặt
   VIEWS.settings = async (el) => {
     const s = await api('/settings'); SETTINGS = s;
-    const shop = s.shop || {}, ship = s.shipping || {}, pay = s.payment || {}, aff = s.affiliate || {}, seo = s.seo || {}, auth = s.auth || {};
+    const shop = s.shop || {}, ship = s.shipping || {}, pay = s.payment || {}, aff = s.affiliate || {}, seo = s.seo || {}, auth = s.auth || {}, loy = s.loyalty || {};
     const isAdmin = ME.role === 'admin';
     el.innerHTML = `
       <div class="g2">
@@ -744,7 +751,13 @@
       </div>
       <div class="card" id="sAff"><h2>Cộng tác viên & hoa hồng</h2>
         <div class="tbl-wrap"><table class="t" id="tiers"><thead><tr><th>Hạng</th><th>Doanh số tháng từ (đ)</th><th>Trực tiếp %</th><th>Gián tiếp 1 %</th><th>Gián tiếp 2 %</th></tr></thead><tbody>${(aff.tiers || []).map((t) => `<tr data-id="${t.id}"><td><input class="inp" data-k="name" value="${esc(t.name)}" /></td><td><input class="inp" type="number" data-k="min_sales" value="${t.min_sales}" /></td><td><input class="inp" type="number" step="any" data-k="direct" value="${t.direct}" /></td><td><input class="inp" type="number" step="any" data-k="l1" value="${t.l1}" /></td><td><input class="inp" type="number" step="any" data-k="l2" value="${t.l2}" /></td></tr>`).join('')}</tbody></table></div>
-        <div style="margin-top:10px">${form([{ k: 'hold_days', l: 'Giữ hoa hồng sau khi giao (ngày)', t: 'number', s: 2 }, { k: 'min_withdraw', l: 'Rút tối thiểu (đ)', t: 'number', s: 2 }, { k: 'payout_days', l: 'Ngày chi trả', s: 2 }, { k: 'cookie_days', l: 'Lưu link giới thiệu (ngày)', t: 'number', s: 2 }, { k: 'buyer_discount_pct', l: 'Khách nhập mã CTV được giảm (%)', t: 'number', s: 2 }, { k: 'lifetime_binding', l: 'Khách gắn trọn đời với CTV đầu tiên', t: 'check', s: 2 }, { k: 'auto_approve', l: 'Tự duyệt CTV mới', t: 'check', s: 2 }], aff)}</div>
+        <div style="margin-top:10px">${form([{ k: 'hold_days', l: 'Giữ hoa hồng sau khi giao (ngày)', t: 'number', s: 2 }, { k: 'min_withdraw', l: 'Rút tối thiểu (đ)', t: 'number', s: 2 }, { k: 'payout_days', l: 'Ngày chi trả', s: 2 }, { k: 'cookie_days', l: 'Lưu link giới thiệu (ngày)', t: 'number', s: 2 }, { k: 'buyer_discount_pct', l: 'Khách nhập mã CTV được giảm (%)', t: 'number', s: 2 }, { k: 'lifetime_binding', l: 'Khách gắn trọn đời với CTV đầu tiên', t: 'check', s: 2 }, { k: 'auto_approve', l: 'Tự duyệt CTV mới', t: 'check', s: 2 },
+          { k: 'self_purchase', l: 'CTV tự mua (đơn bằng SĐT của chính CTV)', t: 'select', s: 4, get: (v) => v.self_purchase || 'commission', o: [['commission', 'Có hoa hồng trực tiếp, không cộng giảm giá mã CTV'], ['none', 'Không hoa hồng cho chính CTV, người giới thiệu nhận như đơn khách'], ['legacy', 'Có giảm giá mã CTV và có hoa hồng']] }], aff)}</div>
+      </div>
+      <div class="card" id="sLoy"><h2>Điểm tích luỹ</h2>
+        <p class="muted small">Điểm cộng theo số điện thoại khi đơn hoàn tất (không tính đơn TikTok/Shopee), thu hồi khi đơn hoàn hàng. Khách đăng nhập dùng điểm để giảm tiền hàng ở bước thanh toán; đơn huỷ được hoàn điểm.</p>
+        ${form([{ k: 'enabled', l: 'Bật điểm tích luỹ', t: 'check', s: 6 }, { k: 'earn_per', l: 'Số tiền hàng để được 1 điểm (đ)', t: 'number', s: 2 }, { k: 'point_value', l: 'Giá trị 1 điểm khi đổi (đ)', t: 'number', s: 2 }, { k: 'max_redeem_pct', l: 'Dùng điểm tối đa (% tiền hàng)', t: 'number', s: 1 }, { k: 'min_redeem', l: 'Tối thiểu mỗi lần (điểm)', t: 'number', s: 1 }], loy)}
+        <p class="muted small" id="loyHint"></p>
       </div>
       <div class="card" id="sAuth"><h2>Tài khoản & xác thực SĐT ${s.status.otp ? '<span class="badge b-green">Gửi OTP sẵn sàng</span>' : '<span class="badge b-sun">Chưa cấu hình gửi OTP</span>'}</h2>
         <p class="muted small">Khách đặt hàng không cần đăng nhập. Khi bật, khách tạo tài khoản và/hoặc đăng ký CTV phải nhập mã OTP gửi qua Zalo (ZNS) hoặc SMS. Nhà cung cấp: <a href="https://esms.vn" target="_blank" rel="noopener">eSMS.vn</a> (một tài khoản gửi được cả Zalo ZNS và SMS brandname). Công tắc chỉ có hiệu lực khi đã cấu hình gửi OTP. Khi chưa bật OTP, khách chưa xác thực chỉ xem được tóm tắt đơn cũ (ẩn địa chỉ).</p>
@@ -779,6 +792,8 @@
       const r = await api('/integrations/thuchi/test', { method: 'POST' });
       toast(r.ok ? `Kết nối SePay OK${r.accounts ? ' · ' + r.accounts + ' tài khoản' : ''}` : 'Chưa kết nối được: ' + (r.error || ''), !r.ok);
     }));
+    const loyHint = () => { const f = readForm($('#sLoy')); const pct = f.earn_per ? (f.point_value / f.earn_per) * 100 : 0; $('#loyHint').textContent = `Tương đương hoàn ${pct.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}% giá trị đơn cho khách.`; };
+    $('#sLoy').addEventListener('input', loyHint); loyHint();
     $('#otpTest').addEventListener('click', (e) => act(e.target, async () => {
       await saveAll(true);
       const ka = $('#kEsmsA').value.trim(), ks = $('#kEsmsS').value.trim();
@@ -815,6 +830,7 @@
         shipping: { ...ship, ...readForm($('#sShip > .form')), origin: { ...readForm($('#sOrigin')), city_name: $('#oCity').selectedOptions[0]?.text || '', district_name: $('#oDist').selectedOptions[0]?.text || '', ward_name: $('#oWard').selectedOptions[0]?.text || '' } },
         affiliate: { ...aff, ...readForm($('#sAff .form')), tiers },
         seo: { ...seo, ...readForm($('#sSeo')) },
+        loyalty: { ...loy, ...readForm($('#sLoy')) },
         auth: (() => { const a = { ...auth, ...readForm($('#sAuthMain')) }; a.ttl_minutes = Number(a.ttl_minutes) || 5; a.esms = { ...(auth.esms || {}), ...readForm($('#sEsms')) }; return a; })(),
       };
       await api('/settings', { method: 'PUT', body });

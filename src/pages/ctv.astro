@@ -4,6 +4,9 @@ import Store from '../layouts/Store.astro';
 import { getSettings } from '../lib/db.js';
 const s = await getSettings(env);
 const aff = s.affiliate || {};
+const selfText = { none: 'Đơn đặt bằng số điện thoại của chính cộng tác viên không tính hoa hồng trực tiếp cho người đó; người giới thiệu của họ nhận hoa hồng như đơn khách thường.',
+  legacy: 'Đơn đặt bằng số điện thoại của chính cộng tác viên vẫn được giảm giá mã cộng tác viên và tính hoa hồng như đơn bán.' }[aff.self_purchase]
+  || 'Đơn đặt bằng số điện thoại của chính cộng tác viên được tính hoa hồng trực tiếp và doanh số xét hạng, nhưng không áp dụng thêm giảm giá mã cộng tác viên.';
 const tiers = [...(aff.tiers || [])].sort((a, b) => a.min_sales - b.min_sales);
 const mil = (n) => (n >= 1e6 ? (n / 1e6).toLocaleString('vi-VN') + ' triệu' : n.toLocaleString('vi-VN') + 'đ');
 const ref = (Astro.url.searchParams.get('ref') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -63,7 +66,8 @@ const ref = (Astro.url.searchParams.get('ref') || '').toUpperCase().replace(/[^A
             <li>Rút tối thiểu {(aff.min_withdraw || 0).toLocaleString('vi-VN')}đ, chi trả {aff.payout_days || 'định kỳ'} về đúng tài khoản ngân hàng đứng tên cộng tác viên.</li>
             <li>DaLa khấu trừ thuế thu nhập cá nhân trên hoa hồng theo quy định hiện hành trước khi chi trả.</li>
             <li>Không quảng cáo sản phẩm có tác dụng chữa bệnh, không tự ý giảm giá dưới giá niêm yết, không spam hay mạo danh DaLa.</li>
-            <li>DaLa có quyền tạm khoá tài khoản và huỷ hoa hồng phát sinh từ đơn ảo, tự mua để hưởng hoa hồng hoặc vi phạm chính sách.</li>
+            <li>{selfText}</li>
+            <li>DaLa có quyền tạm khoá tài khoản và huỷ hoa hồng phát sinh từ đơn ảo hoặc vi phạm chính sách.</li>
           </ul>
           <a href="/chinh-sach#ctv" target="_blank" rel="noopener">Đọc đầy đủ chính sách cộng tác viên</a>
         </div>

@@ -32,6 +32,39 @@
       });
     } else v.innerHTML = '';
 
+    // Điểm tích luỹ
+    const L = d.loyalty;
+    const pc = $('#accPoints');
+    if (L && L.enabled) {
+      pc.hidden = false;
+      pc.innerHTML = `<h3>Điểm tích luỹ</h3><div class="big">${L.points.toLocaleString('vi-VN')} điểm</div>
+        <p class="muted" style="margin:4px 0 0">Trị giá ${vnd(L.value)}. Mỗi ${vnd(L.earn_per)} tiền hàng được 1 điểm khi đơn giao thành công; 1 điểm = ${vnd(L.point_value)}, dùng tối đa ${L.max_redeem_pct}% tiền hàng ở bước thanh toán.</p>
+        <details id="ptsHist"><summary>Lịch sử điểm</summary><ul><li class="muted">Đang tải…</li></ul></details>`;
+      $('#ptsHist').addEventListener('toggle', async (e) => {
+        if (!e.target.open || e.target.dataset.loaded) return; e.target.dataset.loaded = 1;
+        const h = await api('/points');
+        e.target.querySelector('ul').innerHTML = h.history.length ? h.history.map((x) => `<li><span>${esc(x.note || x.type)}<br><small class="muted">${date(x.created_at)}</small></span><b>${x.points > 0 ? '+' : ''}${x.points.toLocaleString('vi-VN')}</b></li>`).join('') : '<li class="muted">Chưa có giao dịch điểm</li>';
+      });
+    } else pc.hidden = true;
+
+    // Khuyến mãi
+    api('/promos').then((pr) => {
+      const box = $('#accPromos');
+      const desc = (v) => (v.type === 'pct' ? `Giảm ${v.value}%${v.max_discount ? ` tối đa ${vnd(v.max_discount)}` : ''}` : v.type === 'fixed' ? `Giảm ${vnd(v.value)}` : 'Miễn phí giao hàng') +
+        (v.min_order ? ` cho đơn từ ${vnd(v.min_order)}` : '') + (v.first_order_only ? ' · đơn đầu tiên' : '') + (v.ends_at ? ` · HSD ${date(v.ends_at)}` : '');
+      const parts = [];
+      if (pr.flash) parts.push(`<a class="promo" href="/flash-sale" style="text-decoration:none;color:inherit"><span><b>⚡ ${esc(pr.flash.name)}</b><small>${pr.flash.items} sản phẩm giá sốc, kết thúc ${new Date(pr.flash.ends_at.replace(' ', 'T') + 'Z').toLocaleString('vi-VN')}</small></span><span class="btn sm sun">Xem</span></a>`);
+      else if (pr.flash_next) parts.push(`<div class="promo"><span><b>⚡ Sắp có: ${esc(pr.flash_next.name)}</b><small>Bắt đầu ${new Date(pr.flash_next.starts_at.replace(' ', 'T') + 'Z').toLocaleString('vi-VN')}</small></span></div>`);
+      parts.push(...pr.vouchers.map((v) => `<div class="promo"><span><code>${esc(v.code)}</code><small>${esc(v.note || desc(v))}</small>${v.note && v.ends_at ? `<small>HSD ${date(v.ends_at)}</small>` : ''}</span><button type="button" class="btn sm ghost" data-copy-code="${esc(v.code)}">Chép mã</button></div>`));
+      if (!parts.length) { box.hidden = true; return; }
+      box.hidden = false;
+      box.innerHTML = `<h3>Khuyến mãi cho bạn</h3>${parts.join('')}`;
+      box.querySelectorAll('[data-copy-code]').forEach((b) => b.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(b.dataset.copyCode); } catch (_) {}
+        b.textContent = 'Đã chép ✓'; setTimeout(() => (b.textContent = 'Chép mã'), 1400);
+      }));
+    }).catch(() => {});
+
     // CTV
     const a = d.affiliate;
     $('#accCtv').innerHTML = a
