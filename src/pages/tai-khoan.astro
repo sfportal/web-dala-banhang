@@ -1,0 +1,51 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../layouts/Store.astro';
+import { getSettings } from '../lib/db.js';
+const s = await getSettings(env);
+---
+<Store title="Tài khoản của tôi | DaLa" description="Đăng nhập bằng số điện thoại để xem đơn hàng đã mua tại DaLa." path="/tai-khoan" noindex settings={s}>
+  <div class="container acc-page">
+    <section id="accGuest" hidden>
+      <div class="acc-guest">
+        <div>
+          <span class="eyebrow">Tài khoản DaLa</span>
+          <h1>Đơn hàng của bạn, <span class="serif">ở một chỗ</span></h1>
+          <p class="lead">Đặt hàng không cần đăng nhập. Tạo tài khoản bằng đúng số điện thoại đã mua để xem lại mọi đơn, theo dõi giao hàng và đăng ký làm cộng tác viên.</p>
+        </div>
+        <div class="panel auth" id="accAuth"></div>
+      </div>
+    </section>
+
+    <section id="accMe" hidden>
+      <div class="dash-head">
+        <div><span class="eyebrow">Tài khoản</span><h1 class="dash-title">Chào <span id="accName"></span></h1><p class="muted" id="accSub"></p></div>
+        <button class="btn ghost sm" id="accLogout">Đăng xuất</button>
+      </div>
+      <div id="accVerify"></div>
+      <div class="acc-grid">
+        <div>
+          <h2 class="acc-h">Đơn hàng đã mua</h2>
+          <div id="accOrders"><p class="muted">Đang tải…</p></div>
+        </div>
+        <aside>
+          <div class="panel" id="accCtv"></div>
+          <form class="panel" id="accProfile" novalidate>
+            <h3>Thông tin nhận hàng</h3>
+            <div class="field"><label for="apName">Họ tên</label><input id="apName" autocomplete="name" /></div>
+            <div class="field"><label for="apEmail">Email</label><input id="apEmail" type="email" autocomplete="email" /></div>
+            <div class="field"><label for="apAddr">Địa chỉ</label><input id="apAddr" autocomplete="street-address" /></div>
+            <div class="field"><label for="apProv">Tỉnh / thành</label><input id="apProv" autocomplete="address-level1" /></div>
+            <details style="margin-bottom:14px"><summary class="muted">Đổi mật khẩu</summary>
+              <div class="field" style="margin-top:10px"><label for="apOld">Mật khẩu hiện tại</label><input id="apOld" type="password" autocomplete="current-password" /></div>
+              <div class="field"><label for="apNew">Mật khẩu mới</label><input id="apNew" type="password" autocomplete="new-password" /></div>
+            </details>
+            <button type="submit" class="btn">Lưu</button>
+          </form>
+        </aside>
+      </div>
+    </section>
+  </div>
+  <script is:inline slot="scripts" src="/assets/js/auth.js?v=1" defer></script>
+  <script is:inline slot="scripts" src="/assets/js/account.js?v=1" defer></script>
+</Store>

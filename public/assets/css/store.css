@@ -591,3 +591,32 @@ body.cart-open .drawer-bg { opacity: 1; pointer-events: auto; }
   .card .add { width: 40px; height: 40px; }
   .card .save { width: 44px; height: 44px; font-size: .75rem; }
 }
+
+/* Tài khoản khách hàng */
+.acc-page { padding: 40px 0 80px; }
+.acc-guest { display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: start; }
+.acc-guest h1 { font-size: clamp(2rem, 4.4vw, 3.2rem); }
+.acc-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.acc-h { font-size: 1.4rem; margin: 0 0 14px; }
+.acc-order header, .acc-order footer, .acc-order li { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.acc-order ul { list-style: none; padding: 10px 0; margin: 10px 0; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); display: grid; gap: 6px; }
+.acc-order footer { margin-bottom: 10px; font-size: .9rem; }
+.acc-order footer .muted { min-width: 0; }
+.badge.b-blue { background: #e0ecff; color: #1d4ed8; } .badge.b-gray { background: #eee; color: #555; } .badge.b-green { background: var(--green-l); color: var(--green-d, #2f5a1d); } .badge.b-sun { background: #fff1d6; color: #8a4b06; }
+.otp-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.otp-row input { letter-spacing: .3em; font-weight: 700; }
+.otp-hint { font-size: .8rem; }
+.verify-box { display: grid; grid-template-columns: 1.2fr 1fr auto; gap: 14px; align-items: end; border-color: var(--sun, #f5b335); }
+.verify-box .field { margin: 0; }
+.aff-apply h2 { margin-top: 0; }
+.aff-apply .sec { font-weight: 700; margin: 18px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.policy-box { max-height: 220px; overflow: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: .9rem; margin-bottom: 12px; }
+.policy-box ul { margin: 6px 0; padding-left: 18px; }
+.agree { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; margin-bottom: 16px; }
+.agree input { margin-top: 4px; width: 18px; height: 18px; flex: none; }
+.acct-link { display: inline-flex; }
+@media (max-width: 860px) {
+  .acc-guest, .acc-grid, .verify-box { grid-template-columns: minmax(0, 1fr); }
+  .row3 { grid-template-columns: 1fr !important; }
+}
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }

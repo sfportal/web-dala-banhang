@@ -7,6 +7,11 @@
   let geoSource = 'static', rateId = null, voucher = '', lastQuote = null, timer;
   const saved = JSON.parse(localStorage.getItem('dala_customer') || '{}');
   for (const k of ['name', 'phone', 'email', 'address']) if (saved[k]) $('#' + k).value = saved[k];
+  // Đã đăng nhập tài khoản khách: điền sẵn thông tin còn trống (không bắt buộc đăng nhập để đặt hàng)
+  fetch('/api/account/me', { credentials: 'same-origin' }).then((r) => r.json()).then((d) => {
+    const c = d && d.customer; if (!c) return;
+    for (const k of ['name', 'phone', 'email', 'address']) if (c[k] && !$('#' + k).value) $('#' + k).value = c[k];
+  }).catch(() => {});
   const pm = () => document.querySelector('input[name=pm]:checked')?.value || 'sepay';
   document.querySelectorAll('input[name=pm]').forEach((r) => r.addEventListener('change', () => {
     document.querySelectorAll('.opt').forEach((o) => o.classList.toggle('on', o.contains(r) ? r.checked : o.querySelector('input').checked));

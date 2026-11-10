@@ -8,9 +8,10 @@ import { checkout, syncPayment, markPaid, setOrderStatus, ensureCommissions, ups
 import { walletSummary, LEVEL_NAMES, tierById } from '../lib/commission.js';
 import { listCities, listDistricts, listWards, quoteShipping, createShipment, verifyGoshipWebhook, goshipLogin, goshipConfig, GOSHIP_STATUS, buildParcel } from '../lib/shipping.js';
 import { testConnection, thuchiConfig } from '../lib/payment.js';
+import { createSession, getSession, endSession } from '../lib/session.js';
+import { accountApi, linkedAffiliate } from './account.js';
+import { sendOtp, otpConfig } from '../lib/otp.js';
 
-const SESSION_DAYS = { admin: 7, aff: 30 };
-const COOKIE = { admin: 'dala_admin', aff: 'dala_aff' };
 
 // Khoá ký link đơn hàng: ưu tiên secret APP_SECRET, nếu không có thì tự sinh một lần và lưu trong D1
 let appSecretCache = null;
@@ -30,24 +31,6 @@ export async function orderToken(env, code) {
   return (await hmacSha256(await appSecret(env), 'order:' + code)).slice(0, 20);
 }
 
-// ---------------------------------------------------------------- phiên đăng nhập
-async function createSession(env, kind, userId, request) {
-  const token = randomToken(24);
-  await run(env, "INSERT INTO sessions (token, kind, user_id, expires_at) VALUES (?,?,?, datetime('now', ?))", token, kind, userId, `+${SESSION_DAYS[kind]} days`);
-  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
-  return `${COOKIE[kind]}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS[kind] * 86400}${secure}`;
-}
-async function getSession(env, request, kind) {
-  const token = getCookie(request, COOKIE[kind]);
-  if (!token) return null;
-  return first(env, "SELECT * FROM sessions WHERE token=? AND kind=? AND expires_at > datetime('now')", token, kind);
-}
-async function endSession(env, request, kind) {
-  const token = getCookie(request, COOKIE[kind]);
-  if (token) await run(env, 'DELETE FROM sessions WHERE token=?', token);
-  return `${COOKIE[kind]}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
-}
-
 async function ensureAdmin(env) {
   const n = await first(env, 'SELECT COUNT(*) n FROM admins');
   if (n.n === 0) {
@@ -64,6 +47,7 @@ export async function handleApi(request, env, ctx) {
   const m = request.method;
   try {
     if (p.startsWith('/api/admin')) return await adminApi(request, env, url, p.slice('/api/admin'.length) || '/', m);
+    if (p.startsWith('/api/account')) return await accountApi(request, env, url, p.slice('/api/account'.length) || '/', m);
     if (p.startsWith('/api/aff')) return await affApi(request, env, url, p.slice('/api/aff'.length) || '/', m);
     return await publicApi(request, env, url, p, m, ctx);
   } catch (e) {
@@ -187,27 +171,8 @@ async function goshipWebhook(request, env, url) {
 async function affApi(request, env, url, p, m) {
   const settings = await getSettings(env);
   const aff = settings.affiliate || {};
-  if (p === '/register' && m === 'POST') {
-    const b = await readBody(request);
-    const phone = normPhone(b.phone);
-    const name = String(b.name || '').trim();
-    if (name.length < 2) throw new HttpError(400, 'Vui lòng nhập họ tên');
-    if (!validPhone(phone)) throw new HttpError(400, 'Số điện thoại chưa đúng');
-    if (String(b.password || '').length < 6) throw new HttpError(400, 'Mật khẩu tối thiểu 6 ký tự');
-    if (await first(env, 'SELECT 1 FROM affiliates WHERE phone=?', phone)) throw new HttpError(409, 'Số điện thoại đã đăng ký, vui lòng đăng nhập');
-    let parent = null;
-    if (b.ref) parent = await first(env, "SELECT id FROM affiliates WHERE code=? AND status='active'", String(b.ref).toUpperCase());
-    let code = slugify(name).replace(/-/g, '').toUpperCase().slice(0, 6) || 'DALA';
-    for (let i = 0; i < 6; i++) {
-      const c = code + randomCode(3, '23456789');
-      if (!(await first(env, 'SELECT 1 FROM affiliates WHERE code=?', c))) { code = c; break; }
-    }
-    const status = aff.auto_approve === false ? 'pending' : 'active';
-    const r = await run(env, 'INSERT INTO affiliates (code, name, phone, email, pass_hash, parent_id, status, province, channel_note) VALUES (?,?,?,?,?,?,?,?,?)',
-      code, name, phone, b.email || null, await hashPassword(String(b.password)), parent?.id || null, status, b.province || null, String(b.channel_note || '').slice(0, 300) || null);
-    const cookie = await createSession(env, 'aff', r.meta.last_row_id, request);
-    return json({ ok: true, code, status }, 200, { 'set-cookie': cookie });
-  }
+  // Đăng ký CTV nay đi qua tài khoản khách: /api/account/register rồi /api/account/affiliate
+  if (p === '/register' && m === 'POST') throw new HttpError(410, 'Vui lòng tạo tài khoản khách hàng rồi đăng ký cộng tác viên');
   if (p === '/login' && m === 'POST') {
     const b = await readBody(request);
     const a = await first(env, 'SELECT * FROM affiliates WHERE phone=?', normPhone(b.phone));
@@ -216,12 +181,17 @@ async function affApi(request, env, url, p, m) {
     await run(env, "UPDATE affiliates SET last_login=datetime('now') WHERE id=?", a.id);
     return json({ ok: true }, 200, { 'set-cookie': await createSession(env, 'aff', a.id, request) });
   }
-  if (p === '/logout' && m === 'POST') return json({ ok: true }, 200, { 'set-cookie': await endSession(env, request, 'aff') });
+  if (p === '/logout' && m === 'POST') {
+    const headers = new Headers({ 'content-type': 'application/json; charset=utf-8' });
+    headers.append('set-cookie', await endSession(env, request, 'aff'));
+    headers.append('set-cookie', await endSession(env, request, 'cust'));
+    return new Response(JSON.stringify({ ok: true }), { headers });
+  }
 
+  // Phiên CTV cũ, hoặc tài khoản khách đã đăng ký CTV
   const sess = await getSession(env, request, 'aff');
-  if (!sess && p === '/me') return json({ guest: true });
-  if (!sess) throw new HttpError(401, 'Vui lòng đăng nhập');
-  const me = await first(env, 'SELECT * FROM affiliates WHERE id=?', sess.user_id);
+  const me = sess ? await first(env, 'SELECT * FROM affiliates WHERE id=?', sess.user_id) : await linkedAffiliate(env, request);
+  if (!me && p === '/me') return json({ guest: true });
   if (!me || me.status === 'blocked') throw new HttpError(401, 'Vui lòng đăng nhập');
   const tiers = aff.tiers || [];
 
@@ -240,7 +210,7 @@ async function affApi(request, env, url, p, m) {
     const parent = me.parent_id ? await first(env, 'SELECT name, code FROM affiliates WHERE id=?', me.parent_id) : null;
     return json({
       me: { id: me.id, code: me.code, name: me.name, phone: me.phone, email: me.email, status: me.status, tier: t, province: me.province,
-        bank_name: me.bank_name, bank_account: me.bank_account, bank_holder: me.bank_holder, created_at: me.created_at, parent },
+        bank_name: me.bank_name, bank_account: me.bank_account, bank_holder: me.bank_holder, tax_code: me.tax_code, address: me.address, created_at: me.created_at, parent },
       tiers, next_tier: next || null, month, by_level: byLevel, wallet: walletSummary(comms, wds), withdrawals: wds.slice(0, 20),
       team: { f1: f1.n, f2: f2.n }, customers: customers.n, clicks_30d: clicks.n,
       policy: { hold_days: aff.hold_days, min_withdraw: aff.min_withdraw, payout_days: aff.payout_days, cookie_days: aff.cookie_days, buyer_discount_pct: aff.buyer_discount_pct },
@@ -263,12 +233,16 @@ async function affApi(request, env, url, p, m) {
   }
   if (p === '/profile' && m === 'PUT') {
     const b = await readBody(request);
-    await run(env, 'UPDATE affiliates SET name=COALESCE(?, name), email=?, province=?, bank_name=?, bank_account=?, bank_holder=? WHERE id=?',
-      b.name || null, b.email || null, b.province || null, b.bank_name || null, String(b.bank_account || '').replace(/\s/g, '') || null, String(b.bank_holder || '').toUpperCase() || null, me.id);
+    const tax = String(b.tax_code ?? me.tax_code ?? '').replace(/\s/g, '');
+    if (tax && !/^\d{10}(\d{2})?$|^\d{10}-\d{3}$/.test(tax)) throw new HttpError(400, 'Mã số thuế cá nhân gồm 10 hoặc 12 chữ số');
+    await run(env, 'UPDATE affiliates SET name=COALESCE(?, name), email=?, province=?, address=COALESCE(?, address), bank_name=?, bank_account=?, bank_holder=?, tax_code=? WHERE id=?',
+      b.name || null, b.email || null, b.province || null, b.address || null, b.bank_name || null, String(b.bank_account || '').replace(/\s/g, '') || null, String(b.bank_holder || '').toUpperCase() || null, tax || null, me.id);
     if (b.new_password) {
       if (!(await verifyPassword(String(b.password || ''), me.pass_hash))) throw new HttpError(400, 'Mật khẩu hiện tại chưa đúng');
       if (String(b.new_password).length < 6) throw new HttpError(400, 'Mật khẩu mới tối thiểu 6 ký tự');
-      await run(env, 'UPDATE affiliates SET pass_hash=? WHERE id=?', await hashPassword(String(b.new_password)), me.id);
+      const h = await hashPassword(String(b.new_password));
+      await run(env, 'UPDATE affiliates SET pass_hash=? WHERE id=?', h, me.id);
+      if (me.customer_id) await run(env, 'UPDATE customers SET pass_hash=? WHERE id=? AND pass_hash IS NOT NULL', h, me.customer_id);
     }
     return json({ ok: true });
   }
@@ -642,24 +616,33 @@ async function adminApi(request, env, url, p, m) {
       const v = await getSetting(env, k, null);
       secrets[k.replace('secret:', '')] = v ? '••••' + String(v).slice(-4) : null;
     }
-    const tc = await thuchiConfig(env); const gc = await goshipConfig(env);
-    return json({ ...s, secrets, status: { thuchi: tc.enabled, goship: gc.enabled }, webhook_url: `${url.origin}/api/goship/webhook` });
+    const tc = await thuchiConfig(env); const gc = await goshipConfig(env); const oc = await otpConfig(env);
+    return json({ ...s, secrets, status: { thuchi: tc.enabled, goship: gc.enabled, otp: oc.ready }, webhook_url: `${url.origin}/api/goship/webhook` });
   }
   if (p === '/settings' && m === 'PUT') {
     need('admin');
     const b = await readBody(request);
-    for (const k of ['shop', 'shipping', 'payment', 'affiliate', 'seo']) if (b[k] && typeof b[k] === 'object') await setSetting(env, k, b[k]);
+    for (const k of ['shop', 'shipping', 'payment', 'affiliate', 'seo', 'auth']) if (b[k] && typeof b[k] === 'object') await setSetting(env, k, b[k]);
     return json({ ok: true });
   }
   if (p === '/settings/secret' && m === 'POST') {
     need('admin');
     const b = await readBody(request);
-    if (!['thuchi_api_key', 'goship_token', 'goship_client_secret'].includes(b.key)) throw new HttpError(400, 'Khoá không hợp lệ');
+    if (!SECRET_KEYS.includes('secret:' + b.key)) throw new HttpError(400, 'Khoá không hợp lệ');
     if (b.value) await setSetting(env, 'secret:' + b.key, String(b.value).trim());
     else await run(env, 'DELETE FROM settings WHERE key=?', 'secret:' + b.key);
     return json({ ok: true });
   }
   if (p === '/integrations/thuchi/test' && m === 'POST') return json(await testConnection(env));
+  if (p === '/integrations/otp/test' && m === 'POST') {
+    need('admin');
+    const b = await readBody(request);
+    return json(await sendOtp(env, { phone: b.phone, purpose: 'test', ip: request.headers.get('cf-connecting-ip'), host: url.hostname, skipLimits: true }));
+  }
+  if (p === '/otp-log' && m === 'GET') {
+    need('admin');
+    return json(await all(env, `SELECT id, phone, purpose, channel, provider, status, error, attempts, created_at, verified_at FROM otp_codes ORDER BY id DESC LIMIT 200`));
+  }
   if (p === '/integrations/goship/login' && m === 'POST') { need('admin'); await goshipLogin(env, await readBody(request)); return json({ ok: true }); }
   if (p === '/integrations/goship/test' && m === 'POST') {
     const c = await listCities(env);

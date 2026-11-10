@@ -16,8 +16,14 @@ Website bán lẻ cho DaLa ("Nắng cao nguyên, quét QR thấy vườn"), xây
 - Tra cứu lô hàng QR, blog.
 - SEO: JSON-LD, sitemap, Open Graph.
 
+**Tài khoản khách hàng (`/tai-khoan`)**
+- Đặt hàng không cần đăng nhập. Khách tạo tài khoản bằng số điện thoại và mật khẩu.
+- Tạo tài khoản bằng số đã từng mua sẽ thấy lại các đơn cũ cùng số. Chưa xác thực SĐT thì chỉ xem tóm tắt đơn (ẩn địa chỉ).
+- Quên mật khẩu bằng mã OTP; trang thanh toán tự điền thông tin khi đã đăng nhập.
+
 **Cộng tác viên (`/ctv`)**
-- Đăng ký miễn phí, có link và mã giới thiệu riêng.
+- Đăng ký từ tài khoản khách: họ tên theo CCCD, ngày sinh, số CCCD, địa chỉ, ngân hàng, mã số thuế cá nhân, xác nhận đã đọc chính sách (lưu phiên bản và thời điểm đồng ý).
+- Có link và mã giới thiệu riêng.
 - Hoa hồng 3 tầng: trực tiếp, gián tiếp 1, gián tiếp 2. Ba hạng tự xét theo doanh số.
 - Ví hoa hồng: hoa hồng giữ lại trong thời gian đổi trả rồi mới chuyển sang khả dụng. CTV gửi yêu cầu rút tiền về ngân hàng.
 - Xem cây đội nhóm F1/F2 và có bộ nội dung bán hàng soạn sẵn.
@@ -78,6 +84,15 @@ Các mục không bắt buộc:
 3. Khai báo webhook `https://<tên-miền>/api/goship/webhook` trên Goship để cập nhật trạng thái vận đơn.
 
 Khi chưa kết nối Goship, website dùng bảng phí dự phòng theo khối lượng. Bảng này có phụ phí hàng dễ vỡ và giảm phí cho các tỉnh gần kho.
+
+### Xác thực số điện thoại (OTP Zalo/SMS)
+
+Dùng [eSMS.vn](https://esms.vn): một tài khoản gửi được cả Zalo ZNS và SMS brandname.
+1. Đăng ký eSMS, khai báo brandname SMS và mẫu tin OTP; kết nối Zalo OA và duyệt mẫu ZNS OTP (1 tham số là mã).
+2. Trong **Cài đặt → Tài khoản & xác thực SĐT**: nhập ApiKey, SecretKey, brandname, OA ID, mã mẫu ZNS, nội dung SMS, rồi bấm "Lưu & gửi thử".
+3. Bật công tắc "Bắt buộc OTP khi tạo tài khoản khách" và/hoặc "khi đăng ký CTV". Kênh mặc định: gửi Zalo trước, eSMS từ chối thì gửi SMS.
+
+Giới hạn chống spam: 60 giây giữa hai lần gửi, 5 mã/giờ mỗi số, 15 mã/giờ mỗi IP, mã hết hạn sau 5 phút, sai 5 lần phải gửi lại. Khi chạy trên máy (`localhost`) có thể đặt `provider` của cài đặt `auth` là `test` để nhận mã ngay trong phản hồi.
 
 ### Pixel và Search Console
 
