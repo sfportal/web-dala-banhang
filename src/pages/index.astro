@@ -1,0 +1,263 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../layouts/Store.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { loadCatalog } from '../lib/catalog.js';
+import { getSettings } from '../lib/db.js';
+import { PERSONAS, JOURNEY, FAQS } from '../lib/content.js';
+
+const [cat, s] = await Promise.all([loadCatalog(env), getSettings(env)]);
+const P = Object.fromEntries(cat.products.map((p) => [p.sku, p]));
+const vnd = (n) => Number(n || 0).toLocaleString('vi-VN') + 'đ';
+const flashItems = cat.products.filter((p) => p.flash);
+const combos = cat.products.filter((p) => p.kind === 'combo');
+const gift = P['QUA-TET'];
+const tiers = s.affiliate?.tiers || [];
+const personaMap = Object.fromEntries(PERSONAS.map((x) => [x.id, cat.products.filter((p) => p.personas?.includes(x.id)).slice(0, 3).map((p) => p.sku)]));
+const words1 = ['Nắng', 'cao', 'nguyên,'];
+const words2 = ['quét', 'QR'];
+const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQS.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) };
+const chapters = [
+  { p: P['BCX-350'], cls: 'c-chuoi', n: '01', eyebrow: 'Chủ lực số 1 · Cho người lo đường huyết, giảm cân',
+    h: 'Bột chuối xanh giữ trọn tinh bột kháng', facts: [['21/25', 'điểm chấm sản phẩm'], ['0g', 'đường thêm'], ['15g', 'một ly mỗi sáng']] },
+  { p: P['CLTH-100'], cls: 'c-chanhleo', n: '02', eyebrow: 'Biểu tượng Tây Nguyên · Ăn vặt lành mạnh', flip: true,
+    h: 'Chanh leo sấy thăng hoa, giòn tan không chiên dầu', facts: [['86,4%', 'diện tích chanh leo cả nước ở Tây Nguyên'], ['100%', 'ruột chanh leo'], ['−40°C', 'sấy thăng hoa giữ màu, mùi']] },
+  { p: P['COT-1L'], cls: 'c-cot', n: '03', eyebrow: 'Chủ lực B2B · Cho quán trà, cà phê',
+    h: 'Cốt chanh leo nguyên chất, quán tự cân vị', facts: [['1 : 4', 'tỷ lệ pha gợi ý'], ['0g', 'đường thêm'], ['48h', 'giao gần Tây Nguyên']] },
+];
+---
+<Store active="home" settings={s} jsonld={[faqLd, { '@context': 'https://schema.org', '@type': 'WebSite', name: 'DaLa', url: (env.SITE_URL || Astro.url.origin) }]}>
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container">
+      <div>
+        <div class="eyebrow fade-up" style="animation-delay:.1s">Từ vườn Tây Nguyên · HTX DaLa</div>
+        <h1>
+          {words1.map((w, i) => <span class="split-word"><span style={`animation-delay:${0.15 + i * 0.08}s`}>{w}</span></span>)}{' '}
+          <br />
+          {words2.map((w, i) => <span class="split-word"><span style={`animation-delay:${0.45 + i * 0.08}s`}>{w}</span></span>)}{' '}
+          <span class="split-word"><span class="hl" style="animation-delay:.65s">thấy vườn.</span></span>
+        </h1>
+        <p class="lead fade-up" style="animation-delay:.8s">Trái cây Tây Nguyên chế biến lành mạnh: bột chuối xanh kháng tinh bột, chanh leo sấy thăng hoa, cốt chanh leo nguyên chất. 100% trái cây, không đường thêm, mỗi gói có QR lô hàng.</p>
+        <div class="ctas fade-up" style="animation-delay:.95s">
+          <a href="#chon-cho-ban" class="btn sun">Chọn món hợp với bạn <span class="shine"></span></a>
+          <a href="/san-pham?loai=combo" class="btn ghost">Xem combo tiết kiệm</a>
+        </div>
+        <div class="trust fade-up" style="animation-delay:1.1s">
+          <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>100% trái cây</span>
+          <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>Không đường thêm</span>
+          <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>COD toàn quốc</span>
+        </div>
+      </div>
+      <div class="stage" data-parallax>
+        <div class="rays"></div>
+        <div class="sun"></div>
+        <div class="hill"></div>
+        <span class="slice s1"></span><span class="slice s2"></span><span class="slice s3"></span><span class="slice s4"></span>
+        <div class="pack p1" data-depth="18"><img src="/assets/img/bcx-350.webp" alt="Bột chuối xanh DaLa hũ 350g" width="900" height="765" fetchpriority="high" /></div>
+        <div class="pack p2" data-depth="30"><img src="/assets/img/clth-100.webp" alt="Chanh leo sấy thăng hoa DaLa 100g" width="778" height="847" fetchpriority="high" /></div>
+        <div class="pack p3" data-depth="22"><img src="/assets/img/cot-1l.webp" alt="Cốt chanh leo nguyên chất DaLa 1 lít" width="855" height="874" /></div>
+        <div class="price-tag">Chanh leo sấy<b>{vnd(P['CLTH-100']?.effective_price)}</b></div>
+        <div class="qr-tag"><i></i><span>Quét QR<br />thấy vườn</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="promise" aria-hidden="true"><div class="track">
+    {[0, 1].map(() => ['100% trái cây Tây Nguyên', 'Không đường thêm', 'Không chất bảo quản', 'Không chiên dầu', 'QR truy xuất từng lô', 'Kiểm nghiệm theo lô'].map((t) => <span>{t}</span>))}
+  </div></div>
+
+  <!-- FLASH SALE -->
+  {cat.flash && flashItems.length > 0 && (
+    <section class="section" style="padding-bottom:0">
+      <div class="container">
+        <div class="flash" data-reveal="zoom">
+          <div class="flash-head">
+            <div class="flash-title">
+              <div class="bolt"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></div>
+              <div><h2>Flash Sale</h2><div style="opacity:.8">{cat.flash.name} · số suất có hạn</div></div>
+            </div>
+            <div><div style="font-size:.8rem;opacity:.8;margin-bottom:6px;text-align:right">Kết thúc sau</div><div class="countdown" data-countdown={cat.flash.ends_at}></div></div>
+          </div>
+          <div class="grid">{flashItems.map((p, i) => <ProductCard p={p} delay={i * 0.06} />)}</div>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- CHỌN THEO NHU CẦU -->
+  <section class="section" id="chon-cho-ban">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <div><div class="eyebrow">Ít món, đúng món</div><h2>Bạn đang tìm gì cho mình?</h2></div>
+        <p class="lead" style="max-width:42ch">Chọn đúng chân dung của bạn, DaLa gợi ý ngay sản phẩm hợp nhu cầu.</p>
+      </div>
+      <div class="personas" role="tablist" data-reveal>
+        {PERSONAS.map((x, i) => <button class:list={['persona-btn', { on: i === 0 }]} role="tab" data-persona={x.id}><span class="ico">{x.ico}</span>{x.label}</button>)}
+      </div>
+      <div class="persona-panel" id="personaPanel" data-reveal>
+        {PERSONAS.map((x, i) => (
+          <div class="persona-view" data-view={x.id} style={i === 0 ? 'display:contents' : 'display:none'}>
+            <div class="persona-card">
+              <div class="who">{x.who}</div>
+              <div class="quote">“{x.quote}”</div>
+              <div style="font-weight:700;margin-top:10px">Điều bạn cần</div>
+              <ul>{x.needs.map((n) => <li>{n}</li>)}</ul>
+            </div>
+            <div class="persona-products">
+              {personaMap[x.id].map((sku, j) => P[sku] && <ProductCard p={P[sku]} delay={j * 0.05} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 CHƯƠNG SẢN PHẨM CHỦ LỰC -->
+  {chapters.map((c) => c.p && (
+    <section class:list={['chapter', c.cls, { flip: c.flip }]} id={c.p.slug}>
+      <div class="num">{c.n}</div>
+      <div class="container">
+        <div class="visual" data-reveal={c.flip ? 'right' : 'left'} data-tilt>
+          <div class="disc"></div>
+          <img class="hero-img" src={c.p.image} alt={`${c.p.name} ${c.p.subtitle}`} loading="lazy" width="900" height="900" />
+        </div>
+        <div data-reveal>
+          <div class="eyebrow">{c.eyebrow}</div>
+          <h2>{c.h}</h2>
+          <p class="lead">{c.p.story}</p>
+          <div class="facts">{c.facts.map(([b, t]) => <div class="fact"><b>{b}</b><span>{t}</span></div>)}</div>
+          <ul class="ticks">{(c.p.benefits || []).slice(0, 3).map((b) => <li>{b}</li>)}</ul>
+          <div class="buy-row">
+            <div class:list={['price', { red: !!c.p.flash && c.cls !== 'c-chanhleo' }]}>{vnd(c.p.effective_price)}{c.p.ref_price && <s style={c.cls === 'c-chanhleo' ? 'color:#cbb8e0' : ''}>{vnd(c.p.ref_price)}</s>}</div>
+            <button class:list={['btn', c.cls === 'c-chanhleo' ? 'sun' : '']} data-add={c.p.sku} data-img={c.p.image.replace('.webp', '-sm.webp')}>Thêm vào giỏ</button>
+            <a href={`/san-pham/${c.p.slug}`} class="btn ghost" style={c.cls === 'c-chanhleo' ? 'color:#fff' : ''}>Chi tiết</a>
+          </div>
+          {(c.p.tiktok_url || c.p.shopee_url) && (
+            <div class="channels">Hoặc mua trên: {c.p.tiktok_url && <a href={c.p.tiktok_url} target="_blank" rel="noopener" data-channel="tiktok">TikTok Shop</a>}{c.p.shopee_url && <a href={c.p.shopee_url} target="_blank" rel="noopener" data-channel="shopee">Shopee</a>}</div>
+          )}
+        </div>
+      </div>
+    </section>
+  ))}
+
+  <!-- COMBO + HỘP QUÀ -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <div><div class="eyebrow">Combo tiết kiệm đến 16%</div><h2>Mua theo bộ, lợi hơn mua lẻ</h2></div>
+        <a href="/san-pham?loai=combo" class="btn ghost sm">Xem tất cả</a>
+      </div>
+      <div class="combo-grid">
+        {combos.map((p, i) => (
+          <a href={`/san-pham/${p.slug}`} class="combo-card" data-reveal style={`--d:${i * 0.08}s;text-decoration:none`}>
+            <div class="media">
+              {p.save_pct > 0 && <span class="badge red" style="position:absolute;top:14px;left:14px">Tiết kiệm {vnd((p.ref_price || 0) - p.effective_price)}</span>}
+              <img src={p.image} alt={p.name} loading="lazy" />
+            </div>
+            <div class="body">
+              <h3>{p.name}</h3>
+              <ul class="items">{(p.components || []).map((c) => <li>{c.qty > 1 ? `${c.qty} × ` : ''}{c.name} · {c.subtitle?.split('·').pop()?.trim()}</li>)}</ul>
+              <p class="muted" style="font-size:.9rem">{p.short_desc}</p>
+              <div class="row" style="display:flex;justify-content:space-between;align-items:center;margin-top:auto">
+                <div class:list={['price', { red: !!p.flash }]}>{vnd(p.effective_price)}{p.ref_price && <s>{vnd(p.ref_price)}</s>}</div>
+                <button class="add" data-add={p.sku} data-img={p.image.replace('.webp', '-sm.webp')} aria-label={`Thêm ${p.name}`}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+      {gift && (
+        <div class="gift-band" data-reveal>
+          <div class="body">
+            <div class="eyebrow">Quà Tết 2027 · Quà doanh nghiệp</div>
+            <h2 style="color:#fff">{gift.name}</h2>
+            <p style="color:#cfc8ad">{gift.short_desc}</p>
+            <ul class="ticks">{gift.benefits.slice(0, 3).map((b) => <li>{b}</li>)}</ul>
+            <div class="buy-row">
+              <div class="price" style="color:#fff">{vnd(gift.effective_price)}</div>
+              <button class="btn sun" data-add={gift.sku} data-img={gift.image}>Đặt hộp quà</button>
+              <a href="/lien-he?chu-de=b2b" class="btn ghost" style="color:#fff">Báo giá doanh nghiệp</a>
+            </div>
+          </div>
+          <img src={gift.image} alt={gift.name} loading="lazy" />
+        </div>
+      )}
+    </div>
+  </section>
+
+  <!-- HÀNH TRÌNH QR -->
+  <section class="section journey" id="hanh-trinh">
+    <div class="container">
+      <div data-reveal style="max-width:720px">
+        <div class="eyebrow">Minh bạch là lời hứa</div>
+        <h2 style="color:#fff">Một mã QR nối từ vườn đến tay bạn</h2>
+        <p class="lead">Đối thủ thường để QR nhỏ ở mặt sau. DaLa đưa QR ra mặt trước, vì đó là bằng chứng chất lượng của từng lô.</p>
+      </div>
+      <div class="steps" id="steps">
+        {JOURNEY.map((j) => <div class="step"><div class="dot">{j.ico}</div><div><h3>{j.title}</h3><p>{j.text}</p></div></div>)}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="stats">
+        <div class="stat" data-reveal><b data-count="86.4" data-dec="1" data-suffix="%">0</b><span>diện tích chanh leo cả nước nằm ở Tây Nguyên</span></div>
+        <div class="stat" data-reveal style="--d:.08s"><b data-count="100" data-suffix="%">0</b><span>trái cây, không đường thêm, không chất bảo quản</span></div>
+        <div class="stat" data-reveal style="--d:.16s"><b data-count="3">0</b><span>dòng chủ lực: bột chuối, chanh leo sấy, cốt chanh leo</span></div>
+        <div class="stat" data-reveal style="--d:.24s"><b data-count="48" data-suffix="h">0</b><span>trái tươi hái sáng, giao trong 48 giờ</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="container qr-demo">
+      <div data-reveal="left">
+        <div class="phone"><div class="screen">
+          <div class="scan"></div>
+          <div class="bar"><small>Lô DL-CL-2611A</small><b style="font-size:1rem">Chanh leo sấy thăng hoa</b></div>
+          <div class="line"><span>Vườn</span><b>Ea Kar, Đắk Lắk</b></div>
+          <div class="line"><span>Thu hái</span><b>28/10/2026</b></div>
+          <div class="line"><span>Chế biến</span><b>30/10/2026</b></div>
+          <div class="line"><span>Kiểm nghiệm</span><b style="color:var(--green)">Đạt ✓</b></div>
+          <div class="line"><span>Hạn dùng</span><b>30/10/2027</b></div>
+          <div style="margin-top:12px;background:var(--sun);border-radius:12px;padding:10px;text-align:center;font-weight:800">Mua lại lô này</div>
+        </div></div>
+      </div>
+      <div data-reveal="right">
+        <div class="eyebrow">Thử ngay</div>
+        <h2>Nhập mã lô trên bao bì để xem vườn trồng</h2>
+        <p class="lead">Trang lô hàng cho bạn biết ai trồng, hái ngày nào, chế biến ở đâu và kết quả kiểm nghiệm. Mỗi lần quét cũng giúp DaLa chăm sóc bạn tốt hơn.</p>
+        <form class="lot-form" action="/truy-xuat" method="get">
+          <input name="ma" placeholder="VD: DL-CL-2611A" aria-label="Mã lô" required />
+          <button class="btn">Tra cứu</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- CỘNG TÁC VIÊN -->
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <div class="ctv-band" data-reveal>
+        <div class="eyebrow" style="color:#4a2a00">Kênh cộng tác viên · Affiliate</div>
+        <h2 style="max-width:20ch">Mỗi người là một cửa hàng DaLa</h2>
+        <p style="max-width:56ch;font-size:1.1rem">Đăng ký miễn phí, nhận link và mã riêng. Hoa hồng trên đơn trực tiếp, cộng thêm hoa hồng gián tiếp từ đội nhóm bạn tuyển. Ví hoa hồng rút về ngân hàng định kỳ.</p>
+        <div class="tiers">
+          {tiers.map((t) => <div class="tier"><small>{t.name}</small><b>{t.direct}%</b><small>{t.min_sales ? `Doanh số từ ${(t.min_sales / 1e6).toLocaleString('vi-VN')} triệu/tháng` : 'Ngay khi đăng ký'} · gián tiếp {t.l1}% + {t.l2}%</small></div>)}
+        </div>
+        <div class="levels"><span>① Trực tiếp: khách mua qua link, mã của bạn</span><span>② Gián tiếp 1: đơn của người bạn tuyển</span><span>③ Gián tiếp 2: đơn của người họ tuyển</span></div>
+        <div style="margin-top:24px;position:relative;z-index:1"><a href="/ctv" class="btn">Đăng ký cộng tác viên <span class="shine"></span></a></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <div style="text-align:center;margin-bottom:30px" data-reveal><div class="eyebrow">Hỏi nhanh, đáp gọn</div><h2>Câu hỏi thường gặp</h2></div>
+      <div class="faq">{FAQS.map(([q, a], i) => <details data-reveal style={`--d:${i * 0.04}s`} open={i === 0}><summary>{q}</summary><p>{a}</p></details>)}</div>
+    </div>
+  </section>
+  <script is:inline slot="scripts" set:html={`window.PERSONA_MAP=${JSON.stringify(personaMap)}`}></script>
+</Store>

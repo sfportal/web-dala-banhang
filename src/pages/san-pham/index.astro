@@ -1,0 +1,32 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../../layouts/Store.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import { loadCatalog } from '../../lib/catalog.js';
+import { PERSONAS } from '../../lib/content.js';
+
+const cat = await loadCatalog(env);
+const loai = Astro.url.searchParams.get('loai') || '';
+const filters = [['', 'Tất cả'], ['chu-luc', 'Chủ lực'], ['combo', 'Combo & hộp quà'], ['dung-thu', 'Cỡ dùng thử'], ['chuoi', 'Bột chuối xanh'], ['chanhleo', 'Chanh leo'], ['quan', 'Cho quán (B2B)']];
+const match = (p, f) => !f ? true : f === 'chu-luc' ? p.kind === 'main' || p.kind === 'b2b' : f === 'combo' ? ['combo', 'gift'].includes(p.kind) : f === 'dung-thu' ? p.kind === 'trial'
+  : f === 'quan' ? p.kind === 'b2b' || p.personas?.includes('quan-tra') : p.line === f;
+const title = loai === 'combo' ? 'Combo & hộp quà DaLa: tiết kiệm đến 16%' : 'Sản phẩm DaLa: bột chuối xanh, chanh leo sấy thăng hoa, cốt chanh leo';
+const list = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: cat.products.map((p, i) => ({ '@type': 'ListItem', position: i + 1, url: `${env.SITE_URL || Astro.url.origin}/san-pham/${p.slug}`, name: p.name })) };
+---
+<Store title={`${title} | DaLa`} description="Trái cây Tây Nguyên chế biến lành mạnh: 3 dòng chủ lực, cỡ dùng thử, combo tiết kiệm và hộp quà Tết. Không đường thêm, QR truy xuất từng lô." active={loai === 'combo' ? 'combo' : 'products'} path={loai ? `/san-pham?loai=${loai}` : '/san-pham'} jsonld={[list]}>
+  <section class="section" style="padding-top:40px">
+    <div class="container">
+      <div class="eyebrow">Ít mã hàng, mỗi mã một câu chuyện</div>
+      <h1 style="font-size:clamp(2rem,4.5vw,3.4rem)">{loai === 'combo' ? 'Combo & hộp quà' : 'Sản phẩm từ vườn Tây Nguyên'}</h1>
+      <p class="lead">3 dòng chủ lực, cỡ dùng thử cho lần đầu, combo tiết kiệm và hộp quà có câu chuyện vùng trồng.</p>
+      <div class="filters" id="filters" style="margin-top:24px">
+        {filters.map(([k, l]) => <button class:list={[{ on: k === loai }]} data-f={k}>{l}</button>)}
+      </div>
+      <div class="grid" id="plist">
+        {cat.products.map((p, i) => <div data-match={filters.filter(([k]) => k && match(p, k)).map(([k]) => k).join(' ')} style={match(p, loai) ? '' : 'display:none'}><ProductCard p={p} delay={(i % 4) * 0.05} /></div>)}
+      </div>
+      <div class="note-box" style="margin-top:30px">Theo kế hoạch năm 2: snack trái cây cho bé, mix sấy thăng hoa, dứa sấy thăng hoa. Đăng ký <a href="/lien-he">nhận tin</a> để mua sớm.</div>
+    </div>
+  </section>
+  <script is:inline slot="scripts" set:html={`document.querySelectorAll('#filters button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#filters button').forEach(x=>x.classList.toggle('on',x===b));const f=b.dataset.f;document.querySelectorAll('#plist>[data-match]').forEach(el=>{const on=!f||el.dataset.match.split(' ').includes(f);el.style.display=on?'':'none';if(on){const c=el.firstElementChild;c.classList.add('in');c.classList.remove('swap-in');void c.offsetWidth;c.classList.add('swap-in')}});history.replaceState(null,'',f?'?loai='+f:location.pathname)});`}></script>
+</Store>

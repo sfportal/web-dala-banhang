@@ -1,0 +1,39 @@
+---
+import Store from '../layouts/Store.astro';
+import { JOURNEY } from '../lib/content.js';
+---
+<Store title="Câu chuyện DaLa: từ vườn Tây Nguyên lên kệ" description="HTX DaLa biến trái cây Tây Nguyên giá thấp thành sản phẩm sức khỏe có thương hiệu: nguyên liệu tại chỗ, dữ liệu vùng trồng FarmBase, nhà máy sấy thăng hoa sẵn có." active="story" path="/cau-chuyen">
+  <section class="hero" style="padding-bottom:30px">
+    <div class="container" style="min-height:0">
+      <div data-reveal>
+        <div class="eyebrow">Câu chuyện DaLa</div>
+        <h1 style="font-size:clamp(2.2rem,5vw,4rem)">Giữ giá trị trái cây <span class="hl" style="color:var(--green)">ở lại Tây Nguyên</span></h1>
+        <p class="lead">Tây Nguyên trồng 86,4% diện tích chanh leo cả nước, nhưng nhiều nông sản vẫn bán tươi hoặc sơ chế, giá trị chảy đi nơi khác. DaLa ra đời để chế biến đúng cách ngay tại vùng trồng, có thương hiệu và minh bạch tới từng lô.</p>
+      </div>
+      <div data-reveal="zoom"><img src="/assets/img/scene.webp" alt="Bộ sản phẩm DaLa" style="border-radius:28px;box-shadow:var(--shadow-lg)" loading="lazy" /></div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="container stats">
+      <div class="stat" data-reveal><b data-count="3" data-suffix="–11×">0</b><span>doanh thu mỗi tấn nguyên liệu khi chế biến đúng cách so với bán tươi</span></div>
+      <div class="stat" data-reveal style="--d:.08s"><b data-count="20000" data-suffix="+">0</b><span>nông dân và gia đình trong Chiến dịch 10.000 ha</span></div>
+      <div class="stat" data-reveal style="--d:.16s"><b data-count="79075">0</b><span>ha cây ăn quả Đắk Lắk năm 2025</span></div>
+      <div class="stat" data-reveal style="--d:.24s"><b data-count="100" data-suffix="%">0</b><span>trái cây, không đường thêm trong mọi sản phẩm chủ lực</span></div>
+    </div>
+  </section>
+  <section class="section journey">
+    <div class="container">
+      <div data-reveal style="max-width:760px"><div class="eyebrow">Thật · Lành · Gần</div><h2 style="color:#fff">Ba lời hứa của DaLa</h2>
+        <p class="lead"><b style="color:#fff">Thật</b>: mỗi lô có tên vườn, nông dân, ngày thu hái, phiếu kiểm nghiệm. <b style="color:#fff">Lành</b>: không đường thêm, không chất bảo quản, không chiên dầu. <b style="color:#fff">Gần</b>: video vườn và nhà máy, khách có thể đến thăm vườn.</p></div>
+      <div class="steps" id="steps">{JOURNEY.map((j) => <div class="step"><div class="dot">{j.ico}</div><div><h3>{j.title}</h3><p>{j.text}</p></div></div>)}</div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px">
+      <div class="panel" data-reveal><h3>🌾 Nông dân, tổ hợp tác</h3><p class="muted">Trồng theo quy trình, ghi nhật ký canh tác trên FarmBase, bán được giá tốt hơn cho cả trái loại 2 không đẹp mã.</p></div>
+      <div class="panel" data-reveal style="--d:.08s"><h3>🏷️ HTX DaLa</h3><p class="muted">Thương hiệu, thu mua, kiểm soát chất lượng, bán hàng đa kênh: TikTok Shop, Shopee, cộng tác viên, chuỗi, quà du lịch, B2B.</p></div>
+      <div class="panel" data-reveal style="--d:.16s"><h3>🏭 Nhà máy chế biến</h3><p class="muted">Đủ 3 công nghệ: sấy, sấy thăng hoa, nước/cao. DaLa không xây nhà máy, tập trung vào thương hiệu và kênh bán.</p></div>
+    </div>
+    <div class="container" style="text-align:center;margin-top:40px"><a class="btn sun" href="/san-pham">Khám phá sản phẩm <span class="shine"></span></a></div>
+  </section>
+</Store>

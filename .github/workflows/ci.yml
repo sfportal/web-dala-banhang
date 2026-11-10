@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Kiểm thử hoa hồng 3 tầng, ví, phí giao hàng
+        run: npm test
+      - name: Build Astro (Cloudflare Workers)
+        run: npm run build
+      - name: Kiểm tra migration D1 chạy được trên DB trống
+        run: npx wrangler d1 migrations apply dala-shop --local

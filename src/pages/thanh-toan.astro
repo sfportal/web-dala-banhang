@@ -1,0 +1,58 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../layouts/Store.astro';
+import { getSettings } from '../lib/db.js';
+const s = await getSettings(env);
+const pay = s.payment || {};
+---
+<Store title="Thanh toán | DaLa" path="/thanh-toan" noindex settings={s}>
+  <div class="container">
+    <nav class="crumbs"><a href="/">Trang chủ</a> / <a href="#" data-open-cart>Giỏ hàng</a> / <span>Thanh toán</span></nav>
+    <form class="checkout" id="co" novalidate>
+      <div>
+        <div class="panel">
+          <h2><span class="n">1</span>Người nhận</h2>
+          <div class="row2">
+            <div class="field"><label for="name">Họ tên</label><input id="name" name="name" autocomplete="name" required /></div>
+            <div class="field"><label for="phone">Số điện thoại</label><input id="phone" name="phone" inputmode="tel" autocomplete="tel" required placeholder="09xxxxxxxx" /></div>
+          </div>
+          <div class="field"><label for="email">Email <span class="muted">(không bắt buộc, để nhận hoá đơn)</span></label><input id="email" name="email" type="email" autocomplete="email" /></div>
+        </div>
+        <div class="panel">
+          <h2><span class="n">2</span>Địa chỉ giao hàng</h2>
+          <div class="row3" id="geo">
+            <div class="field"><label for="city">Tỉnh / Thành phố</label><select id="city" required><option value="">Đang tải…</option></select></div>
+            <div class="field" id="fDistrict"><label for="district">Quận / Huyện</label><select id="district" disabled><option value="">Chọn tỉnh trước</option></select></div>
+            <div class="field" id="fWard"><label for="ward">Phường / Xã</label><select id="ward" disabled><option value="">Chọn quận trước</option></select></div>
+          </div>
+          <div class="field"><label for="address">Số nhà, tên đường <span class="muted" id="addrHint"></span></label><input id="address" name="address" autocomplete="street-address" required /></div>
+          <div class="field"><label for="note">Ghi chú cho shop <span class="muted">(không bắt buộc)</span></label><textarea id="note" rows="2" placeholder="VD: giao giờ hành chính, gọi trước khi giao"></textarea></div>
+        </div>
+        <div class="panel">
+          <h2><span class="n">3</span>Vận chuyển</h2>
+          <div id="shipOpts"><p class="muted">Chọn địa chỉ để xem phí giao hàng.</p></div>
+          <div class="muted" style="font-size:.85rem" id="parcelInfo"></div>
+        </div>
+        <div class="panel">
+          <h2><span class="n">4</span>Thanh toán</h2>
+          {pay.online_enabled !== false && <label class="opt on"><input type="radio" name="pm" value="sepay" checked /><div class="t"><b>Chuyển khoản qua mã QR <span class="badge green">Khuyên dùng</span></b><small>Quét VietQR bằng app ngân hàng bất kỳ, đơn được xác nhận tự động trong vài giây.</small></div><span style="font-size:1.6rem">📲</span></label>}
+          {pay.cod_enabled !== false && <label class:list={['opt', { on: pay.online_enabled === false }]}><input type="radio" name="pm" value="cod" checked={pay.online_enabled === false} /><div class="t"><b>Trả tiền mặt khi nhận hàng (COD)</b><small>Thanh toán cho shipper khi nhận hàng{pay.cod_max ? `, áp dụng đơn đến ${pay.cod_max.toLocaleString('vi-VN')}đ` : ''}.</small></div><span style="font-size:1.6rem">💵</span></label>}
+        </div>
+      </div>
+      <aside class="summary">
+        <div class="panel">
+          <h2>Đơn hàng của bạn</h2>
+          <div id="lines"><p class="muted">Đang tải giỏ hàng…</p></div>
+          <div class="voucher"><input id="voucher" placeholder="Mã giảm giá hoặc mã giới thiệu" aria-label="Mã giảm giá" /><button type="button" class="btn sm" id="applyV">Áp dụng</button></div>
+          <div id="refNote"></div>
+          <div id="sums"></div>
+          <div id="errs"></div>
+          <input type="text" name="website" id="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true" />
+          <button class="btn sun block" id="submit" style="margin-top:14px;padding:16px">Đặt hàng <span class="shine"></span></button>
+          <p class="muted" style="font-size:.8rem;text-align:center;margin:10px 0 0">Bằng việc đặt hàng, bạn đồng ý với <a href="/chinh-sach">chính sách mua hàng</a> của DaLa.</p>
+        </div>
+      </aside>
+    </form>
+  </div>
+  <script is:inline slot="scripts" src="/assets/js/checkout.js?v=1" defer></script>
+</Store>

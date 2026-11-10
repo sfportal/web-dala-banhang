@@ -1,0 +1,33 @@
+---
+import { env } from 'cloudflare:workers';
+import Store from '../layouts/Store.astro';
+import { getSettings } from '../lib/db.js';
+const s = await getSettings(env);
+const shop = s.shop || {};
+const topic = Astro.url.searchParams.get('chu-de') || 'tu-van';
+const topics = [['tu-van', 'Tư vấn sản phẩm'], ['b2b', 'Quà doanh nghiệp, đại lý, quán'], ['doi-tra', 'Đổi trả, khiếu nại'], ['ctv', 'Cộng tác viên'], ['khac', 'Khác']];
+---
+<Store title="Liên hệ DaLa: tư vấn, quà doanh nghiệp, đại lý" description="Gửi yêu cầu tư vấn, báo giá quà Tết doanh nghiệp, đại lý, quán trà hoặc hỗ trợ đổi trả. DaLa phản hồi trong giờ làm việc." path="/lien-he" settings={s}>
+  <section class="section" style="padding-top:40px"><div class="container checkout" style="padding:0">
+    <div class="panel">
+      <h1 style="font-size:2rem">Gửi lời nhắn cho DaLa</h1>
+      <form id="cf">
+        <div class="row2"><div class="field"><label>Họ tên</label><input name="name" required /></div><div class="field"><label>Số điện thoại</label><input name="phone" inputmode="tel" required /></div></div>
+        <div class="field"><label>Chủ đề</label><select name="topic">{topics.map(([k, l]) => <option value={k} selected={k === topic}>{l}</option>)}</select></div>
+        <div class="field"><label>Mã đơn hàng (nếu có)</label><input name="order_code" placeholder="DL123456" /></div>
+        <div class="field"><label>Nội dung</label><textarea name="message" rows="5" required placeholder="VD: cần 50 hộp quà Tết có in logo công ty, giao trước 20/1"></textarea></div>
+        <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true" />
+        <button class="btn sun">Gửi yêu cầu</button>
+      </form>
+    </div>
+    <aside class="panel">
+      <h2>Thông tin</h2>
+      <p><b>{shop.legal_name}</b><br />{shop.address}</p>
+      {shop.hotline && <p>Hotline: <a href={`tel:${shop.hotline}`}>{shop.hotline}</a></p>}
+      {shop.zalo && <p>Zalo: {shop.zalo}</p>}
+      {shop.email && <p>Email: {shop.email}</p>}
+      <div class="note-box">Quà doanh nghiệp: xuất hoá đơn, in thiệp và logo theo yêu cầu, giá sỉ từ 20 hộp.</div>
+    </aside>
+  </div></section>
+  <script is:inline slot="scripts" set:html={`document.getElementById('cf').onsubmit=async function(e){e.preventDefault();var b=this.querySelector('button');b.disabled=true;var d=Object.fromEntries(new FormData(this));var r=await fetch('/api/contact',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(d)});var j=await r.json();b.disabled=false;if(r.ok){this.innerHTML='<div class="success"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></div><h2>Đã nhận lời nhắn!</h2><p class="muted">DaLa sẽ liên hệ lại trong giờ làm việc.</p></div>'}else dalaToast(j.error||'Lỗi',true)}`}></script>
+</Store>

@@ -1,0 +1,21 @@
+{
+  "name": "dala-shop",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Website bán hàng DaLa + quản trị CRM/CSM, affiliate 3 tầng, SePay, Goship (Astro + Cloudflare Workers + D1)",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply dala-shop --local",
+    "db:migrate": "wrangler d1 migrations apply dala-shop --remote",
+    "deploy": "astro build && wrangler deploy",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.4.7",
+    "astro": "^7.4.10",
+    "wrangler": "^4.160.0"
+  }
+}

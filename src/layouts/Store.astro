@@ -1,0 +1,134 @@
+---
+// Khung chung cho mọi trang cửa hàng: SEO, pixel, header, giỏ hàng, footer
+import { env } from 'cloudflare:workers';
+import { getSettings } from '../lib/db.js';
+import { activeFlash } from '../lib/catalog.js';
+
+interface Props { title?: string; description?: string; image?: string; path?: string; jsonld?: any[]; noindex?: boolean; active?: string; mobileBuy?: boolean; settings?: any }
+const p = Astro.props;
+const s = p.settings || (await getSettings(env));
+const seo = s.seo || {};
+const shop = s.shop || {};
+const site = (env.SITE_URL || Astro.url.origin).replace(/\/$/, '');
+const title = p.title ? `${p.title}` : seo.title;
+const desc = p.description || seo.description;
+const canonical = site + (p.path ?? Astro.url.pathname);
+const img = (p.image || seo.og_image || '/assets/img/og.jpg');
+const ogImg = img.startsWith('http') ? img : site + img;
+const flash = await activeFlash(env);
+const org = { '@context': 'https://schema.org', '@type': 'Organization', name: shop.legal_name || 'HTX DaLa', alternateName: 'DaLa', url: site, logo: site + '/assets/img/logo.png',
+  slogan: shop.slogan, address: { '@type': 'PostalAddress', addressLocality: shop.address, addressCountry: 'VN' }, ...(shop.hotline ? { telephone: shop.hotline } : {}) };
+const jsonld = [org, ...(p.jsonld || [])];
+const free = s.shipping?.free_threshold || 0;
+const nav = [['/san-pham', 'Sản phẩm', 'products'], ['/san-pham?loai=combo', 'Combo & quà', 'combo'], ['/flash-sale', 'Flash Sale', 'flash'], ['/cau-chuyen', 'Câu chuyện', 'story'], ['/truy-xuat', 'Quét QR', 'qr'], ['/ctv', 'Cộng tác viên', 'ctv']];
+const boot = { free_threshold: free, flash_ends: flash.sale?.ends_at || null, cookie_days: s.affiliate?.cookie_days || 30, ga4: seo.ga4 || null };
+---
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="description" content={desc} />
+  {seo.keywords && <meta name="keywords" content={seo.keywords} />}
+  <link rel="canonical" href={canonical} />
+  {p.noindex && <meta name="robots" content="noindex, nofollow" />}
+  <meta name="theme-color" content="#2e7827" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="DaLa" />
+  <meta property="og:locale" content="vi_VN" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={desc} />
+  <meta property="og:url" content={canonical} />
+  <meta property="og:image" content={ogImg} />
+  <meta name="twitter:card" content="summary_large_image" />
+  {seo.gsc_verify && <meta name="google-site-verification" content={seo.gsc_verify} />}
+  <link rel="icon" type="image/png" href="/assets/img/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/img/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Lora:ital,wght@1,500;1,600&display=swap" />
+  <link rel="stylesheet" href="/assets/css/store.css?v=1" />
+  {jsonld.map((j) => <script type="application/ld+json" set:html={JSON.stringify(j)} />)}
+  <script is:inline set:html={`window.DALA=${JSON.stringify(boot)}`} />
+  {seo.ga4 && <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${seo.ga4}`}></script>}
+  {seo.ga4 && <script is:inline set:html={`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${seo.ga4}');`} />}
+  {seo.fb_pixel && <script is:inline set:html={`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${seo.fb_pixel}');fbq('track','PageView');`} />}
+  {seo.tiktok_pixel && <script is:inline set:html={`!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var n=d.createElement("script");n.async=!0;n.src="https://analytics.tiktok.com/i18n/pixel/events.js?sdkid="+e+"&lib="+t;d.head.appendChild(n)};ttq.load('${seo.tiktok_pixel}');ttq.page()}(window,document,'ttq');`} />}
+  {seo.head_extra && <Fragment set:html={seo.head_extra} />}
+</head>
+<body>
+  <div class="topbar" aria-label="Ưu đãi">
+    <div class="track">
+      {[0, 1].map(() => (
+        <Fragment>
+          <span>☀ Nắng cao nguyên, quét QR thấy vườn</span>
+          {free > 0 && <span>🚚 Miễn phí giao hàng đơn từ {free.toLocaleString('vi-VN')}đ</span>}
+          <span>💳 Chuyển khoản QR hoặc trả tiền khi nhận hàng (COD)</span>
+          {flash.sale && <span>⚡ Flash Sale đang diễn ra, số suất có hạn</span>}
+          <span>🌱 100% trái cây · Không đường thêm · Không chất bảo quản</span>
+          <span>🤝 Làm cộng tác viên, hoa hồng đến 25%</span>
+        </Fragment>
+      ))}
+    </div>
+  </div>
+  <header class="header" id="hdr">
+    <div class="container">
+      <button class="icon-btn menu-btn" aria-label="Mở menu" data-menu><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+      <a href="/" class="logo" aria-label="DaLa trang chủ"><img src="/assets/img/logo.webp" alt="DaLa" width="90" height="40" /></a>
+      <nav class="nav" id="nav">
+        {nav.map(([href, label, key]) => <a href={href} class:list={[{ active: p.active === key, 'nav-flash': key === 'flash' }]}>{key === 'flash' ? '⚡ ' : ''}{label}</a>)}
+      </nav>
+      <div class="spacer"></div>
+      <a href="/ctv" class="btn sm ghost ctv-link">Kiếm tiền cùng DaLa</a>
+      <button class="icon-btn" aria-label="Giỏ hàng" data-open-cart>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+        <span class="cart-count" id="cartCount">0</span>
+      </button>
+    </div>
+  </header>
+  <main>
+    <slot />
+  </main>
+  <footer class="footer">
+    <div class="container">
+      <div class="cols">
+        <div>
+          <a href="/" class="logo"><img src="/assets/img/logo-light.webp" alt="DaLa" width="104" height="46" /></a>
+          <p>{shop.legal_name}. Trái cây Tây Nguyên chế biến lành mạnh: sấy thăng hoa, sấy dẻo không đường, cốt nguyên chất, bột chức năng.</p>
+          <p style="font-family:var(--serif);font-style:italic;color:#f2c25a">“{shop.slogan}”</p>
+        </div>
+        <div>
+          <h4>Mua sắm</h4>
+          <a href="/san-pham">Tất cả sản phẩm</a><a href="/san-pham?loai=combo">Combo & hộp quà</a><a href="/flash-sale">Flash Sale</a><a href="/truy-xuat">Tra cứu mã lô QR</a>
+        </div>
+        <div>
+          <h4>Về DaLa</h4>
+          <a href="/cau-chuyen">Câu chuyện từ vườn</a><a href="/blog">Góc dinh dưỡng</a><a href="/ctv">Cộng tác viên, đại lý</a><a href="/lien-he">Liên hệ, quà doanh nghiệp</a>
+        </div>
+        <div>
+          <h4>Hỗ trợ</h4>
+          <a href="/chinh-sach#giao-hang">Giao hàng</a><a href="/chinh-sach#doi-tra">Đổi trả</a><a href="/chinh-sach#thanh-toan">Thanh toán</a><a href="/chinh-sach#bao-mat">Bảo mật</a>
+          {shop.hotline && <a href={`tel:${shop.hotline}`}>Hotline {shop.hotline}</a>}
+          {shop.tiktok_shop && <a href={shop.tiktok_shop} rel="noopener" target="_blank">TikTok Shop</a>}
+          {shop.shopee_shop && <a href={shop.shopee_shop} rel="noopener" target="_blank">Shopee</a>}
+        </div>
+      </div>
+      <div class="bottom">
+        <span>© 2027 {shop.legal_name}. {shop.address}</span>
+        <span>Sản phẩm là thực phẩm, không phải thuốc, không thay thế thuốc chữa bệnh.</span>
+      </div>
+    </div>
+  </footer>
+
+  <div class="drawer-bg" data-close-cart></div>
+  <aside class="drawer" aria-label="Giỏ hàng" id="drawer">
+    <header><h3>Giỏ hàng</h3><button class="icon-btn" data-close-cart aria-label="Đóng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <div class="body" id="cartBody"></div>
+    <footer id="cartFoot"></footer>
+  </aside>
+  <div class="toast-wrap" id="toasts"></div>
+  <script is:inline src="/assets/js/store.js?v=1" defer></script>
+  <slot name="scripts" />
+</body>
+</html>

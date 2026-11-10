@@ -1,3 +1,111 @@
-# DaLa · Website bán hàng
+# DaLa · Website bán hàng, cộng tác viên và quản trị
 
-Website bán lẻ, cổng cộng tác viên và trang quản trị cho DaLa. Mã nguồn được đưa vào qua pull request đầu tiên.
+Website bán lẻ cho DaLa ("Nắng cao nguyên, quét QR thấy vườn"), xây theo kế hoạch bán lẻ nội địa 2027–2029.
+
+- **Công nghệ**: Astro 7 (SSR) chạy trên Cloudflare Workers, cơ sở dữ liệu Cloudflare D1.
+- **Thanh toán**: chuyển khoản VietQR qua SePay (hệ thống Thu-Chi) hoặc trả tiền khi nhận hàng (COD).
+- **Phí giao hàng**: tính theo Goship, có xét khối lượng, kích thước và hàng dễ vỡ.
+
+## Tính năng
+
+**Cửa hàng**
+- Trang chủ có motion: hero chuyển động, câu chuyện từng dòng sản phẩm, gợi ý theo chân dung khách, hành trình QR.
+- Combo và hộp quà.
+- Flash sale có đếm ngược, giới hạn suất và giới hạn mỗi đơn.
+- Giỏ hàng trượt, thanh toán một trang, trang đơn hàng tự xác nhận khi tiền về.
+- Tra cứu lô hàng QR, blog.
+- SEO: JSON-LD, sitemap, Open Graph.
+
+**Cộng tác viên (`/ctv`)**
+- Đăng ký miễn phí, có link và mã giới thiệu riêng.
+- Hoa hồng 3 tầng: trực tiếp, gián tiếp 1, gián tiếp 2. Ba hạng tự xét theo doanh số.
+- Ví hoa hồng: hoa hồng giữ lại trong thời gian đổi trả rồi mới chuyển sang khả dụng. CTV gửi yêu cầu rút tiền về ngân hàng.
+- Xem cây đội nhóm F1/F2 và có bộ nội dung bán hàng soạn sẵn.
+
+**Quản trị (`/admin`)**
+- Tổng quan: KPI, doanh thu, kênh bán, phễu mua hàng, việc cần làm.
+- Đơn hàng đa kênh: website, CTV, TikTok Shop, Shopee, Zalo, B2B. Có thể tạo đơn tay, nhập file CSV từ TikTok/Shopee và xuất CSV.
+- Vận đơn Goship.
+- Sản phẩm và combo (khối lượng, kích thước, hàng dễ vỡ, link sàn, SEO), flash sale, mã giảm giá.
+- CRM: phân nhóm khách, dòng thời gian, ghi chú.
+- CSM: việc chăm sóc tự tạo (hỏi thăm sau giao hàng, nhắc mua lại), phiếu hỗ trợ.
+- Cộng tác viên, hoa hồng, duyệt rút tiền có VietQR chuyển khoản.
+- Lô hàng và QR, bài viết, chấm điểm SEO, analytics riêng (nguồn truy cập, trang, sản phẩm, link CTV, UTM, lượt quét QR).
+- Cài đặt và phân quyền người dùng: quản trị, vận hành, chỉ xem.
+
+## Chạy trên máy
+
+```bash
+npm ci
+cp .dev.vars.example .dev.vars          # đặt ADMIN_PASSWORD, APP_SECRET
+npm run db:migrate:local                # tạo bảng + dữ liệu mẫu
+npm run build && npx wrangler dev       # http://localhost:8787
+npm test                                # kiểm thử hoa hồng, ví, phí giao hàng
+```
+
+Vào `/admin` bằng tài khoản `admin` với mật khẩu là `ADMIN_PASSWORD`. Nếu chưa đặt biến này, mật khẩu là `dala12345`, nên đổi ngay sau khi đăng nhập.
+
+## Triển khai (CI/CD)
+
+Repo có sẵn hai quy trình GitHub Actions:
+
+- **CI** (`.github/workflows/ci.yml`) chạy ở mỗi PR và mỗi lần push nhánh: chạy test, build, rồi thử migration trên một D1 trống.
+- **Deploy** (`.github/workflows/deploy.yml`) chạy khi merge vào `main`: chạy test, áp migration D1 lên bản thật, build, deploy Worker và cập nhật secret.
+
+### Cài đặt một lần
+
+1. Tạo cơ sở dữ liệu: `npx wrangler d1 create dala-shop` và ghi lại `database_id`.
+2. Tạo Cloudflare API token (mẫu "Edit Cloudflare Workers", thêm quyền D1 Edit).
+3. Trong GitHub, vào **Settings → Secrets and variables → Actions**:
+   - Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ADMIN_PASSWORD`, `APP_SECRET` (chuỗi ngẫu nhiên, ít nhất 32 ký tự).
+   - Variables: `D1_DATABASE_ID` (bắt buộc), `SITE_URL` (ví dụ `https://dala.vn`).
+4. Merge vào `main`. Sau lần deploy đầu, gắn tên miền cho Worker trong Cloudflare.
+
+### Kết nối thanh toán và giao hàng (trong trang quản trị)
+
+**SePay qua hệ thống Thu-Chi**
+1. Trong Thu-Chi, vào **Cài đặt → API keys** và tạo key có quyền ghi.
+2. Trong DaLa, vào **Quản trị → Cài đặt → Thanh toán**: nhập địa chỉ Thu-Chi và API key, rồi bấm "Lưu & kiểm tra".
+3. Khách quét mã VietQR. SePay báo tiền về cho Thu-Chi, DaLa đối soát mỗi 4 giây trên trang đơn và mỗi 5 phút bằng cron, rồi tự xác nhận đơn và tạo hoa hồng.
+
+**Goship**
+1. Trong **Cài đặt → Giao hàng**, đăng nhập bằng tài khoản Goship kèm `client_id`/`client_secret`, hoặc dán access token.
+2. Chọn địa chỉ lấy hàng.
+3. Khai báo webhook `https://<tên-miền>/api/goship/webhook` trên Goship để cập nhật trạng thái vận đơn.
+
+Khi chưa kết nối Goship, website dùng bảng phí dự phòng theo khối lượng. Bảng này có phụ phí hàng dễ vỡ và giảm phí cho các tỉnh gần kho.
+
+### Pixel và Search Console
+
+Vào **Cài đặt → SEO & đo lường** để nhập GA4, Meta Pixel, TikTok Pixel và mã xác minh Google Search Console.
+
+## Quy tắc nghiệp vụ chính
+
+- **Doanh số tính hoa hồng**: tiền hàng sau khi trừ giảm giá theo tỷ lệ, không tính phí ship. Món nào tắt "Tính hoa hồng" sẽ bị loại.
+- **Ghi nhận CTV cho đơn**, theo thứ tự ưu tiên:
+  1. Mã CTV nhập lúc thanh toán (khách được giảm %).
+  2. Link `?ref=` (lưu 30 ngày).
+  3. Khách đã gắn với CTV từ trước (gắn trọn đời).
+- **Vòng đời hoa hồng**:
+  - Tạo ở trạng thái *chờ* khi đơn được thanh toán (QR) hoặc khi đặt COD.
+  - Khi đơn hoàn tất, sau `hold_days` ngày sẽ chuyển sang *khả dụng*.
+  - Huỷ nếu đơn huỷ hoặc hoàn hàng.
+- **Hạng CTV**: xét theo doanh số trực tiếp lấy mức cao hơn giữa tháng này và tháng trước. Quản trị có thể khoá hạng.
+- **Flash sale**: phần vượt suất hoặc vượt giới hạn mỗi đơn tính giá thường. Đơn huỷ được trả lại suất và tồn kho.
+- **Combo**: tồn kho tính theo thành phần, bán combo sẽ trừ kho thành phần.
+- **Khoai lang sấy dẻo**: chỉ bán kèm với sản phẩm khác.
+- **Đơn QR chưa thanh toán**: tự huỷ sau `expire_minutes` phút.
+
+Giá, combo đề xuất, dữ liệu lô hàng và bài viết trong `migrations/0002_seed.sql` là **dữ liệu mẫu**, sửa được trong trang quản trị. Sản phẩm là thực phẩm, nội dung không đưa ra công dụng chữa bệnh.
+
+## Cấu trúc
+
+```
+src/lib/          commission.js (hoa hồng), catalog.js (giá, flash, giỏ), orders.js (đơn, thanh toán, cron),
+                  shipping.js (Goship + dự phòng), payment.js (SePay/Thu-Chi), db.js, util.js, content.js
+src/server/api.js API công khai, /api/aff/* (CTV), /api/admin/* (quản trị)
+src/pages/        trang cửa hàng (Astro), ctv.astro, admin.astro
+public/assets/    css, js (store, checkout, order, ctv, admin), ảnh sản phẩm đã tách nền
+migrations/       0001_init.sql (bảng), 0002_seed.sql (dữ liệu khởi tạo, sinh từ scripts/gen-seed.py)
+test/             kiểm thử node:test
+```
