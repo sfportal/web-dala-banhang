@@ -12,8 +12,22 @@ import { testConnection, thuchiConfig } from '../lib/payment.js';
 const SESSION_DAYS = { admin: 7, aff: 30 };
 const COOKIE = { admin: 'dala_admin', aff: 'dala_aff' };
 
+// Khoá ký link đơn hàng: ưu tiên secret APP_SECRET, nếu không có thì tự sinh một lần và lưu trong D1
+let appSecretCache = null;
+async function appSecret(env) {
+  if (env.APP_SECRET) return env.APP_SECRET;
+  if (appSecretCache) return appSecretCache;
+  let v = await getSetting(env, 'secret:app_secret', null);
+  if (!v) {
+    await run(env, 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 'secret:app_secret', JSON.stringify(randomToken(32)));
+    v = await getSetting(env, 'secret:app_secret', null);
+  }
+  appSecretCache = v;
+  return v;
+}
+
 export async function orderToken(env, code) {
-  return (await hmacSha256(env.APP_SECRET || 'dala-dev-secret-doi-khi-deploy', 'order:' + code)).slice(0, 20);
+  return (await hmacSha256(await appSecret(env), 'order:' + code)).slice(0, 20);
 }
 
 // ---------------------------------------------------------------- phiên đăng nhập
