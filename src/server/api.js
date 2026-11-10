@@ -11,6 +11,7 @@ import { testConnection, thuchiConfig } from '../lib/payment.js';
 import { createSession, getSession, endSession } from '../lib/session.js';
 import { accountApi, linkedAffiliate } from './account.js';
 import { sendOtp, otpConfig } from '../lib/otp.js';
+import { adjustPoints } from '../lib/loyalty.js';
 
 
 // Khoá ký link đơn hàng: ưu tiên secret APP_SECRET, nếu không có thì tự sinh một lần và lưu trong D1
@@ -57,19 +58,27 @@ export async function handleApi(request, env, ctx) {
   }
 }
 
+// Khách đã đăng nhập: gắn id từ phiên để đổi điểm (không tin giá trị trình duyệt gửi)
+async function withCustomer(env, request, b) {
+  delete b.points_customer_id;
+  const s = await getSession(env, request, 'cust');
+  if (s) b.points_customer_id = s.user_id;
+  return b;
+}
+
 // ---------------------------------------------------------------- công khai
 async function publicApi(request, env, url, p, m, ctx) {
   let mm;
   if (p === '/api/catalog' && m === 'GET') return json(await loadCatalog(env), 200, { 'cache-control': 'public, max-age=30' });
 
   if (p === '/api/cart/quote' && m === 'POST') {
-    const b = await readBody(request);
+    const b = await withCustomer(env, request, await readBody(request));
     const q = await priceCart(env, b, { withShipping: !!(b.to && (b.to.province || b.to.city)) });
     return json(q);
   }
 
   if (p === '/api/checkout' && m === 'POST') {
-    const b = await readBody(request);
+    const b = await withCustomer(env, request, await readBody(request));
     if (b.website) throw new HttpError(400, 'Không hợp lệ'); // bẫy bot
     const { order } = await checkout(env, b, { sid: b.sid, utm_source: b.utm?.source, utm_medium: b.utm?.medium, utm_campaign: b.utm?.campaign });
     return json({ code: order.code, token: await orderToken(env, order.code), total: order.total, payment_method: order.payment_method });
@@ -421,11 +430,11 @@ async function adminApi(request, env, url, p, m) {
     const code = String(b.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!code || !['pct', 'fixed', 'freeship'].includes(b.type)) throw new HttpError(400, 'Cần mã và loại giảm giá');
     if (await first(env, 'SELECT 1 FROM affiliates WHERE code=?', code)) throw new HttpError(400, 'Mã trùng với mã cộng tác viên');
-    await run(env, `INSERT INTO vouchers (code, type, value, min_order, max_discount, usage_limit, first_order_only, starts_at, ends_at, note, active) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    await run(env, `INSERT INTO vouchers (code, type, value, min_order, max_discount, usage_limit, first_order_only, starts_at, ends_at, note, active, public) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(code) DO UPDATE SET type=excluded.type, value=excluded.value, min_order=excluded.min_order, max_discount=excluded.max_discount, usage_limit=excluded.usage_limit,
-      first_order_only=excluded.first_order_only, starts_at=excluded.starts_at, ends_at=excluded.ends_at, note=excluded.note, active=excluded.active`,
+      first_order_only=excluded.first_order_only, starts_at=excluded.starts_at, ends_at=excluded.ends_at, note=excluded.note, active=excluded.active, public=excluded.public`,
     code, b.type, Number(b.value) || 0, Number(b.min_order) || 0, Number(b.max_discount) || null, Number(b.usage_limit) || null, b.first_order_only ? 1 : 0,
-    toSqlTime(b.starts_at), toSqlTime(b.ends_at), b.note || null, b.active === false ? 0 : 1);
+    toSqlTime(b.starts_at), toSqlTime(b.ends_at), b.note || null, b.active === false ? 0 : 1, b.public === false ? 0 : 1);
     return json({ ok: true });
   }
   if ((mm = p.match(/^\/vouchers\/([A-Z0-9]+)$/)) && m === 'DELETE') { await run(env, 'DELETE FROM vouchers WHERE code=?', mm[1]); return json({ ok: true }); }
@@ -461,7 +470,15 @@ async function adminApi(request, env, url, p, m) {
       all(env, 'SELECT * FROM tickets WHERE customer_id=? OR phone=? ORDER BY id DESC', id, c.phone),
       all(env, `SELECT i.name, SUM(i.qty) qty FROM order_items i JOIN orders o ON o.id=i.order_id WHERE o.customer_id=? AND o.status NOT IN ('cancelled','returned') GROUP BY i.name ORDER BY qty DESC LIMIT 5`, id),
     ]);
-    return json({ ...c, segment: segmentOf(c), orders, notes, tasks, tickets, favorites: fav });
+    delete c.pass_hash;
+    const points_history = await all(env, 'SELECT type, points, note, created_by, created_at FROM points_ledger WHERE customer_id=? ORDER BY id DESC LIMIT 50', id);
+    return json({ ...c, segment: segmentOf(c), orders, notes, tasks, tickets, favorites: fav, points_history });
+  }
+  if ((mm = p.match(/^\/customers\/(\d+)\/points$/)) && m === 'POST') {
+    need('ops');
+    const b = await readBody(request);
+    await adjustPoints(env, Number(mm[1]), b.points, b.note, user.username);
+    return json({ ok: true });
   }
   if ((mm = p.match(/^\/customers\/(\d+)$/)) && m === 'PUT') {
     const b = await readBody(request);
@@ -622,7 +639,7 @@ async function adminApi(request, env, url, p, m) {
   if (p === '/settings' && m === 'PUT') {
     need('admin');
     const b = await readBody(request);
-    for (const k of ['shop', 'shipping', 'payment', 'affiliate', 'seo', 'auth']) if (b[k] && typeof b[k] === 'object') await setSetting(env, k, b[k]);
+    for (const k of ['shop', 'shipping', 'payment', 'affiliate', 'seo', 'auth', 'loyalty']) if (b[k] && typeof b[k] === 'object') await setSetting(env, k, b[k]);
     return json({ ok: true });
   }
   if (p === '/settings/secret' && m === 'POST') {

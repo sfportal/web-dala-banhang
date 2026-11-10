@@ -2,6 +2,7 @@
 import { all, first, getSettings } from './db.js';
 import { HttpError, normPhone, parseJson } from './util.js';
 import { buildParcel, quoteShipping } from './shipping.js';
+import { loyaltyConfig, redeemPlan, earnFor } from './loyalty.js';
 
 const JSON_FIELDS = { benefits: [], badges: [], personas: [], combo_items: null };
 
@@ -160,11 +161,39 @@ export async function priceCart(env, input, { withShipping = true } = {}) {
     if (c) { affiliate = c; refSource = 'bound'; }
   }
 
+  // ---- CTV tự mua (SĐT người mua trùng SĐT của CTV được ghi nhận)
+  //   commission (mặc định): vẫn tính hoa hồng trực tiếp, không cộng giảm giá mã CTV
+  //   none: không hoa hồng cho chính CTV, người giới thiệu của họ nhận như đơn khách thường
+  //   legacy: giữ cách cũ (giảm giá mã + hoa hồng)
+  let selfPurchase = false;
+  const selfMode = aff.self_purchase || 'commission';
+  if (affiliate && input.phone && selfMode !== 'legacy') {
+    const ap = await first(env, 'SELECT phone FROM affiliates WHERE id=?', affiliate.id);
+    if (ap && ap.phone === normPhone(input.phone)) {
+      selfPurchase = true;
+      if (refSource === 'code' && !voucher) { discount = 0; discountLabel = null; }
+      if (selfMode === 'none') {
+        const up = affiliate.parent_id ? await first(env, "SELECT id, code, name, tier, status, parent_id FROM affiliates WHERE id=? AND status='active'", affiliate.parent_id) : null;
+        affiliate = up || null; refSource = up ? 'upline' : null;
+      }
+    }
+  }
+
+  // ---- điểm tích luỹ (chỉ khi đã đăng nhập: points_customer_id do máy chủ gắn từ phiên, không lấy từ trình duyệt)
+  const loyalty = await loyaltyConfig(env);
+  let points = null, pointsDiscount = 0;
+  if (input.points_customer_id && loyalty.enabled) {
+    const c = await first(env, 'SELECT points FROM customers WHERE id=?', input.points_customer_id);
+    const plan = redeemPlan(loyalty, c?.points || 0, subtotal - discount, input.use_points);
+    pointsDiscount = plan.amount;
+    points = { balance: c?.points || 0, max: plan.max, used: plan.use, discount: plan.amount, point_value: loyalty.point_value, min_redeem: loyalty.min_redeem };
+  }
+
   // ---- giao hàng
   const ship = settings.shipping || {};
   const parcel = buildParcel(lines, ship);
-  const after = subtotal - discount;
-  const freeByThreshold = ship.free_threshold > 0 && after >= ship.free_threshold;
+  const after = subtotal - discount - pointsDiscount;
+  const freeByThreshold = ship.free_threshold > 0 && after + pointsDiscount >= ship.free_threshold; // đổi điểm không làm mất miễn phí ship
   let shipping = { options: [], selected: null, fee: 0, shop_pays: false };
   if (withShipping && lines.length) {
     const cod = input.payment_method === 'cod' ? after : 0;
@@ -176,8 +205,9 @@ export async function priceCart(env, input, { withShipping = true } = {}) {
   const total = Math.max(0, after + shipping.fee);
   return {
     lines, subtotal, discount, discount_label: discountLabel, voucher: voucher?.code || null,
+    points, points_discount: pointsDiscount, points_earn: earnFor(loyalty, after),
     affiliate: affiliate ? { id: affiliate.id, code: affiliate.code, name: affiliate.name, tier: affiliate.tier, status: affiliate.status, parent_id: affiliate.parent_id } : null,
-    ref_source: refSource, parcel, shipping, total, errors,
-    free_threshold: ship.free_threshold || 0, free_gap: ship.free_threshold > after ? ship.free_threshold - after : 0,
+    ref_source: refSource, self_purchase: selfPurchase, parcel, shipping, total, errors,
+    free_threshold: ship.free_threshold || 0, free_gap: ship.free_threshold > after + pointsDiscount ? ship.free_threshold - after - pointsDiscount : 0,
   };
 }

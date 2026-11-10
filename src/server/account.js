@@ -7,6 +7,8 @@ import { HttpError, json, readBody, normPhone, validPhone, hashPassword, verifyP
 import { createSession, getSession, endSession } from '../lib/session.js';
 import { sendOtp, verifyOtp, otpConfig } from '../lib/otp.js';
 import { STATUS_LABEL, PAY_LABEL } from '../lib/orders.js';
+import { loyaltyConfig } from '../lib/loyalty.js';
+import { activeFlash } from '../lib/catalog.js';
 import { orderToken } from './api.js';
 
 const BANK_RE = /^\d{6,20}$/;
@@ -133,8 +135,10 @@ export async function accountApi(request, env, url, p, m) {
   const aff = await first(env, 'SELECT id, code, status, name, created_at FROM affiliates WHERE customer_id=?', me.id);
 
   if (p === '/me' && m === 'GET') {
+    const lc = await loyaltyConfig(env);
+    const loyalty = { enabled: lc.enabled, points: me.points || 0, value: (me.points || 0) * lc.point_value, earn_per: lc.earn_per, point_value: lc.point_value, max_redeem_pct: lc.max_redeem_pct, min_redeem: lc.min_redeem };
     const stats = await first(env, "SELECT COUNT(*) n, IFNULL(SUM(CASE WHEN status NOT IN ('cancelled','returned') THEN total END),0) spent FROM orders WHERE phone=? OR customer_id=?", me.phone, me.id);
-    return json({ customer: publicCustomer(me), affiliate: aff || null, stats, flags });
+    return json({ customer: publicCustomer(me), affiliate: aff || null, stats, flags, loyalty });
   }
 
   if (p === '/orders' && m === 'GET') {
@@ -154,6 +158,26 @@ export async function accountApi(request, env, url, p, m) {
       });
     }
     return json({ verified, orders: out });
+  }
+
+  if (p === '/points' && m === 'GET') {
+    const rows = await all(env, `SELECT l.type, l.points, l.note, l.created_at, o.code FROM points_ledger l LEFT JOIN orders o ON o.id=l.order_id
+      WHERE l.customer_id=? ORDER BY l.id DESC LIMIT 100`, me.id);
+    return json({ points: me.points || 0, history: rows });
+  }
+
+  if (p === '/promos' && m === 'GET') {
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const vs = await all(env, `SELECT code, type, value, min_order, max_discount, first_order_only, ends_at, note FROM vouchers
+      WHERE active=1 AND public=1 AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?) AND (usage_limit IS NULL OR used<usage_limit)
+      ORDER BY created_at DESC LIMIT 30`, now, now);
+    const firstDone = await first(env, "SELECT 1 x FROM orders WHERE (phone=? OR customer_id=?) AND status!='cancelled' LIMIT 1", me.phone, me.id);
+    const flash = await activeFlash(env);
+    return json({
+      vouchers: vs.filter((v) => !(v.first_order_only && firstDone)),
+      flash: flash.sale ? { name: flash.sale.name, ends_at: flash.sale.ends_at, items: flash.items.size } : null,
+      flash_next: !flash.sale && flash.next ? { name: flash.next.name, starts_at: flash.next.starts_at } : null,
+    });
   }
 
   if (p === '/verify-phone' && m === 'POST') {

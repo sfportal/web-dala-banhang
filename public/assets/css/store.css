@@ -625,3 +625,18 @@ body.cart-open .drawer-bg { opacity: 1; pointer-events: auto; }
   .row3 { grid-template-columns: 1fr !important; }
 }
 .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+/* Điểm tích luỹ */
+.points-opt { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1.5px dashed var(--line); border-radius: 14px; margin: 10px 0; cursor: pointer; font-size: .92rem; }
+.points-opt.on { border-color: var(--green); background: var(--green-l); }
+.points-opt input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+.points-card { background: linear-gradient(135deg, var(--green, #2f7a32), #1d4f22); color: #fff; border: 0; }
+.points-card h3 { margin: 0 0 4px; color: #fff; }
+.points-card .big { font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.points-card .muted { color: rgba(255,255,255,.8); }
+.points-card details summary { cursor: pointer; color: rgba(255,255,255,.9); margin-top: 10px; }
+.points-card ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; font-size: .85rem; max-height: 220px; overflow: auto; }
+.points-card li { display: flex; justify-content: space-between; gap: 10px; }
+.promo { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1.5px dashed var(--sun, #f5b335); border-radius: 14px; margin-bottom: 10px; background: #fffaf0; }
+.promo code { font-weight: 800; font-size: 1rem; letter-spacing: .04em; }
+.promo small { display: block; color: var(--muted); }

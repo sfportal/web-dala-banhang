@@ -2,6 +2,7 @@
 import { all, first, run, stmt, getSettings } from './db.js';
 import { HttpError, normPhone, validPhone, nowSql, addDays, randomCode } from './util.js';
 import { priceCart, loadProducts } from './catalog.js';
+import { reservePoints, recordRedeem, onOrderStatus } from './loyalty.js';
 import { buildCommissions, commissionBase, tierFor } from './commission.js';
 import { createPaymentRequest, getPaymentRequest, thuchiConfig, manualQr } from './payment.js';
 
@@ -87,17 +88,21 @@ export async function checkout(env, b, meta = {}) {
     settings.affiliate?.lifetime_binding !== false);
   const code = await newOrderCode(env);
   const sel = q.shipping.selected;
+  // Điểm tích luỹ: trừ trước khi tạo đơn; giảm giá từ điểm cộng vào discount để hoa hồng tính trên tiền khách thực trả
+  const pointsUsed = q.points?.used || 0;
+  if (pointsUsed) await reservePoints(env, b.points_customer_id, pointsUsed);
   const r = await run(env, `INSERT INTO orders (code, channel, customer_id, name, phone, email, address, province, city_code, district_code, ward_code, district, ward, note,
       subtotal, discount, shipping_fee, total, voucher_code, affiliate_id, ref_source, payment_method, shipping_carrier, shipping_service, shipping_rate_id, shipping_expected,
-      shipping_cost, shop_pays_ship, parcel_weight, parcel_dims, fragile, utm_source, utm_medium, utm_campaign, session_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      shipping_cost, shop_pays_ship, parcel_weight, parcel_dims, fragile, utm_source, utm_medium, utm_campaign, session_id, points_used, points_discount)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   code, aff ? 'ctv' : 'web', customerId, name, phone, b.email || null, address, to.province || to.city_name || null, to.city || null, to.district || null, to.ward || null,
   to.district_name || null, to.ward_name || null, String(b.note || '').slice(0, 500) || null,
-  q.subtotal, q.discount, q.shipping.fee, q.total, q.voucher, aff?.id || null, q.ref_source, method,
+  q.subtotal, q.discount + (q.points_discount || 0), q.shipping.fee, q.total, q.voucher, aff?.id || null, q.ref_source, method,
   sel?.carrier || null, sel?.service || null, sel?.id || null, sel?.expected || null, q.shipping.carrier_fee || null, q.shipping.shop_pays ? 1 : 0,
   q.parcel.weight, JSON.stringify(q.parcel), q.parcel.fragile ? 1 : 0,
-  meta.utm_source || null, meta.utm_medium || null, meta.utm_campaign || null, meta.sid || null);
+  meta.utm_source || null, meta.utm_medium || null, meta.utm_campaign || null, meta.sid || null, pointsUsed, q.points_discount || 0);
   const orderId = r.meta.last_row_id;
+  if (pointsUsed) await recordRedeem(env, b.points_customer_id, { id: orderId, code, points_used: pointsUsed });
   await env.DB.batch(q.lines.map((l) => stmt(env, 'INSERT INTO order_items (order_id, product_id, sku, name, price, qty, flash_item_id, commissionable) VALUES (?,?,?,?,?,?,?,?)',
     orderId, l.product_id, l.sku, `${l.name} · ${l.subtitle || ''}`.replace(/ · $/, ''), l.price, l.qty, l.flash_item_id, l.commissionable)));
   let order = await first(env, 'SELECT * FROM orders WHERE id=?', orderId);
@@ -227,6 +232,7 @@ export async function setOrderStatus(env, order, status, by = 'admin') {
     const o = await first(env, 'SELECT * FROM orders WHERE id=?', order.id);
     if (o.payment_method !== 'sepay' || o.payment_status === 'paid') await ensureCommissions(env, o);
   }
+  await onOrderStatus(env, await first(env, 'SELECT * FROM orders WHERE id=?', order.id), order.status, status);
   if (order.affiliate_id) await recomputeTier(env, order.affiliate_id);
   await refreshCustomerStats(env, order.customer_id);
   return first(env, 'SELECT * FROM orders WHERE id=?', order.id);
