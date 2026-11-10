@@ -18,35 +18,60 @@ const ref = (Astro.url.searchParams.get('ref') || '').toUpperCase().replace(/[^A
           <h1>Chia sẻ <span class="serif">nắng cao nguyên</span>, nhận hoa hồng mỗi đơn</h1>
           <p class="lead">Không vốn, không ôm hàng. DaLa giao hàng, thu tiền, chăm sóc khách. Bạn chỉ cần chia sẻ link hoặc mã giới thiệu riêng.</p>
           <div class="ctv-steps">
-            <div><b>1</b>Đăng ký 30 giây, có ngay link và mã</div>
+            <div><b>1</b>Tạo tài khoản bằng số điện thoại, điền hồ sơ, có ngay link và mã</div>
             <div><b>2</b>Khách mua qua link hoặc nhập mã, được giảm {aff.buyer_discount_pct || 5}%</div>
             <div><b>3</b>Hoa hồng vào ví, rút về ngân hàng ngày {aff.payout_days || 'định kỳ'}</div>
           </div>
         </div>
-        <div class="panel auth" id="auth">
-          <div class="auth-tabs" role="tablist"><button class="on" data-auth="reg">Đăng ký</button><button data-auth="login">Đăng nhập</button></div>
-          <form id="regForm" novalidate>
-            <div class="field"><label for="rName">Họ tên</label><input id="rName" autocomplete="name" required /></div>
-            <div class="row2">
-              <div class="field"><label for="rPhone">Số điện thoại</label><input id="rPhone" inputmode="tel" autocomplete="tel" required placeholder="09xxxxxxxx" /></div>
-              <div class="field"><label for="rPass">Mật khẩu</label><input id="rPass" type="password" autocomplete="new-password" required minlength="6" placeholder="Tối thiểu 6 ký tự" /></div>
-            </div>
-            <div class="row2">
-              <div class="field"><label for="rProv">Tỉnh / thành</label><input id="rProv" autocomplete="address-level1" /></div>
-              <div class="field"><label for="rRef">Mã người giới thiệu <span class="muted">(nếu có)</span></label><input id="rRef" value={ref} style="text-transform:uppercase" /></div>
-            </div>
-            <div class="field"><label for="rNote">Bạn bán qua kênh nào? <span class="muted">(không bắt buộc)</span></label><input id="rNote" placeholder="VD: Facebook cá nhân, nhóm mẹ bỉm, TikTok, cửa hàng" /></div>
-            <button class="btn sun block">Đăng ký miễn phí <span class="shine"></span></button>
-            <p class="muted" style="font-size:.8rem;margin:10px 0 0">Đăng ký nghĩa là bạn đồng ý với <a href="/chinh-sach#ctv">chính sách cộng tác viên</a>.</p>
-          </form>
-          <form id="loginForm" hidden novalidate>
-            <div class="field"><label for="lPhone">Số điện thoại</label><input id="lPhone" inputmode="tel" autocomplete="tel" required /></div>
-            <div class="field"><label for="lPass">Mật khẩu</label><input id="lPass" type="password" autocomplete="current-password" required /></div>
-            <button class="btn block">Đăng nhập</button>
-            <p class="muted" style="font-size:.8rem;margin:10px 0 0">Quên mật khẩu? <a href="/lien-he?chu-de=ctv">Liên hệ DaLa</a> để được cấp lại.</p>
-          </form>
-        </div>
+        <div class="panel auth" id="auth"><p class="muted">Đang tải…</p></div>
       </div>
+
+      <!-- Hồ sơ đăng ký CTV (đã đăng nhập tài khoản khách) -->
+      <form class="panel aff-apply" id="apply" hidden novalidate>
+        <span id="dang-ky"></span>
+        <h2>Hồ sơ đăng ký cộng tác viên</h2>
+        <p class="muted">Thông tin dùng để chi trả hoa hồng và khấu trừ thuế thu nhập cá nhân theo quy định. DaLa bảo mật và không chia sẻ cho bên thứ ba.</p>
+        <div class="sec">Thông tin cá nhân</div>
+        <div class="row2">
+          <div class="field"><label for="fName">Họ và tên (như trên CCCD)</label><input id="fName" autocomplete="name" required /></div>
+          <div class="field"><label for="fBirth">Ngày sinh</label><input id="fBirth" type="date" required /></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="fId">Số CCCD</label><input id="fId" inputmode="numeric" maxlength="12" required placeholder="12 chữ số" /></div>
+          <div class="field"><label for="fEmail">Email</label><input id="fEmail" type="email" autocomplete="email" /></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="fAddr">Địa chỉ liên hệ</label><input id="fAddr" autocomplete="street-address" required /></div>
+          <div class="field"><label for="fProv">Tỉnh / thành</label><input id="fProv" autocomplete="address-level1" required /></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="fNote">Bạn bán qua kênh nào?</label><input id="fNote" placeholder="VD: Facebook, nhóm mẹ bỉm, TikTok, cửa hàng" /></div>
+          <div class="field"><label for="fRef">Mã người giới thiệu <span class="muted">(nếu có)</span></label><input id="fRef" value={ref} style="text-transform:uppercase" /></div>
+        </div>
+        <div class="sec">Nhận hoa hồng và thuế</div>
+        <div class="row3">
+          <div class="field"><label for="fBank">Ngân hàng</label><input id="fBank" list="banks" required placeholder="VD: Vietcombank" /></div>
+          <div class="field"><label for="fAcc">Số tài khoản</label><input id="fAcc" inputmode="numeric" required /></div>
+          <div class="field"><label for="fHolder">Chủ tài khoản (không dấu)</label><input id="fHolder" required style="text-transform:uppercase" /></div>
+        </div>
+        <div class="field"><label for="fTax">Mã số thuế cá nhân</label><input id="fTax" inputmode="numeric" required placeholder="10 hoặc 12 số" /><span class="muted" style="font-size:.8rem">Từ 01/07/2025 số CCCD được dùng làm mã số thuế cá nhân. <a href="#" id="taxFromId">Dùng số CCCD</a></span></div>
+        <div class="sec">Chính sách cộng tác viên</div>
+        <div class="policy-box">
+          <ul>
+            <li>Hoa hồng trực tiếp {tiers.map((t) => `${t.direct}%`).join(' / ')} theo hạng, gián tiếp 1 và gián tiếp 2 theo bảng hạng; tính trên tiền hàng sau giảm giá, không tính phí ship.</li>
+            <li>Hoa hồng ghi nhận khi đơn giao thành công, chuyển sang khả dụng sau {aff.hold_days ?? 7} ngày; huỷ nếu đơn bị huỷ hoặc hoàn hàng.</li>
+            <li>Rút tối thiểu {(aff.min_withdraw || 0).toLocaleString('vi-VN')}đ, chi trả {aff.payout_days || 'định kỳ'} về đúng tài khoản ngân hàng đứng tên cộng tác viên.</li>
+            <li>DaLa khấu trừ thuế thu nhập cá nhân trên hoa hồng theo quy định hiện hành trước khi chi trả.</li>
+            <li>Không quảng cáo sản phẩm có tác dụng chữa bệnh, không tự ý giảm giá dưới giá niêm yết, không spam hay mạo danh DaLa.</li>
+            <li>DaLa có quyền tạm khoá tài khoản và huỷ hoa hồng phát sinh từ đơn ảo, tự mua để hưởng hoa hồng hoặc vi phạm chính sách.</li>
+          </ul>
+          <a href="/chinh-sach#ctv" target="_blank" rel="noopener">Đọc đầy đủ chính sách cộng tác viên</a>
+        </div>
+        <label class="agree"><input type="checkbox" id="fAgree" /> Tôi đã đọc, hiểu và đồng ý với chính sách cộng tác viên của DaLa, đồng thời cam kết thông tin trên là chính xác.</label>
+        <div id="fOtpBox"></div>
+        <button type="submit" class="btn sun">Gửi hồ sơ đăng ký <span class="shine"></span></button>
+      </form>
+      <datalist id="banks">{['Vietcombank', 'VietinBank', 'BIDV', 'Agribank', 'Techcombank', 'MB Bank', 'ACB', 'VPBank', 'TPBank', 'Sacombank', 'VIB', 'HDBank', 'SHB', 'OCB', 'MSB', 'SeABank', 'LienVietPostBank', 'Nam A Bank', 'Bac A Bank', 'Cake', 'Timo'].map((b) => <option value={b} />)}</datalist>
 
       <section class="ctv-band" style="margin:40px 0">
         <h2>Ba hạng, ba mức hoa hồng</h2>
@@ -98,7 +123,7 @@ const ref = (Astro.url.searchParams.get('ref') || '').toUpperCase().replace(/[^A
         <button class="on" data-dtab="orders">Đơn và hoa hồng</button>
         <button data-dtab="team">Đội nhóm</button>
         <button data-dtab="wd">Lịch sử rút</button>
-        <button data-dtab="profile">Tài khoản ngân hàng</button>
+        <button data-dtab="profile">Ngân hàng & thuế</button>
         <button data-dtab="kit">Bộ nội dung bán hàng</button>
       </div>
       <div class="tab-pane on" data-dpane="orders"><div id="orders" class="tbl-wrap"><p class="muted">Đang tải…</p></div></div>
@@ -115,7 +140,10 @@ const ref = (Astro.url.searchParams.get('ref') || '').toUpperCase().replace(/[^A
             <div class="field"><label for="pBank">Ngân hàng</label><input id="pBank" list="banks" placeholder="VD: Vietcombank" /></div>
             <div class="field"><label for="pAcc">Số tài khoản</label><input id="pAcc" inputmode="numeric" /></div>
           </div>
-          <div class="field"><label for="pHolder">Chủ tài khoản (không dấu)</label><input id="pHolder" style="text-transform:uppercase" /></div>
+          <div class="row2">
+            <div class="field"><label for="pHolder">Chủ tài khoản (không dấu)</label><input id="pHolder" style="text-transform:uppercase" /></div>
+            <div class="field"><label for="pTax">Mã số thuế cá nhân</label><input id="pTax" inputmode="numeric" /></div>
+          </div>
           <details style="margin-bottom:14px"><summary class="muted">Đổi mật khẩu</summary>
             <div class="row2" style="margin-top:10px">
               <div class="field"><label for="pOld">Mật khẩu hiện tại</label><input id="pOld" type="password" autocomplete="current-password" /></div>
@@ -124,7 +152,6 @@ const ref = (Astro.url.searchParams.get('ref') || '').toUpperCase().replace(/[^A
           </details>
           <button class="btn">Lưu thông tin</button>
         </form>
-        <datalist id="banks">{['Vietcombank', 'VietinBank', 'BIDV', 'Agribank', 'Techcombank', 'MB Bank', 'ACB', 'VPBank', 'TPBank', 'Sacombank', 'VIB', 'HDBank', 'SHB', 'OCB', 'MSB', 'SeABank', 'LienVietPostBank', 'Nam A Bank', 'Bac A Bank', 'Cake', 'Timo'].map((b) => <option value={b} />)}</datalist>
       </div>
       <div class="tab-pane" data-dpane="kit">
         <div class="kit-grid" id="kit"></div>
@@ -141,5 +168,6 @@ const ref = (Astro.url.searchParams.get('ref') || '').toUpperCase().replace(/[^A
       </form>
     </div>
   </div>
-  <script is:inline slot="scripts" src="/assets/js/ctv.js?v=1" defer></script>
+  <script is:inline slot="scripts" src="/assets/js/auth.js?v=1" defer></script>
+  <script is:inline slot="scripts" src="/assets/js/ctv.js?v=2" defer></script>
 </Store>

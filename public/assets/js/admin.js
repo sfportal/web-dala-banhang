@@ -574,7 +574,9 @@
     const a = await api('/affiliates/' + id).catch(fail); if (!a) return;
     const d = openDrawer(`${esc(a.name)} <span class="badge b-purple">${esc(a.code)}</span>`, `
       <div class="kpis"><div class="kpi"><small>Số dư rút được</small><b>${vnd(a.wallet.balance)}</b></div><div class="kpi"><small>Hoa hồng chờ</small><b>${vnd(a.wallet.pending)}</b></div><div class="kpi"><small>Đã chi trả</small><b>${vnd(a.wallet.paid)}</b></div><div class="kpi"><small>Khách · tổng chi</small><b>${a.customers.n} · ${vnd(a.customers.spent)}</b></div></div>
-      <div class="g2"><div class="card"><dl class="kv"><dt>SĐT</dt><dd><a href="tel:${esc(a.phone)}">${esc(a.phone)}</a></dd><dt>Email</dt><dd>${esc(a.email || '—')}</dd><dt>Tỉnh</dt><dd>${esc(a.province || '—')}</dd>
+      <div class="g2"><div class="card"><dl class="kv"><dt>SĐT</dt><dd><a href="tel:${esc(a.phone)}">${esc(a.phone)}</a> ${a.phone_verified ? '<span class="badge b-green">Đã xác thực</span>' : '<span class="badge">Chưa xác thực</span>'}</dd>
+        <dt>Ngày sinh</dt><dd>${esc(a.birth_date || '—')}</dd><dt>CCCD</dt><dd>${esc(a.id_number || '—')}</dd><dt>MST cá nhân</dt><dd>${esc(a.tax_code || '—')}</dd><dt>Địa chỉ</dt><dd>${esc(a.address || '—')}</dd>
+        <dt>Chính sách</dt><dd>${a.policy_agreed_at ? `Đồng ý bản ${esc(a.policy_version || '')} lúc ${dt(a.policy_agreed_at)}` : '—'}</dd><dt>Email</dt><dd>${esc(a.email || '—')}</dd><dt>Tỉnh</dt><dd>${esc(a.province || '—')}</dd>
         <dt>Kênh bán</dt><dd>${esc(a.channel_note || '—')}</dd><dt>Ngân hàng</dt><dd>${esc([a.bank_name, a.bank_account, a.bank_holder].filter(Boolean).join(' · ') || '—')}</dd>
         <dt>Tham gia</dt><dd>${dd(a.created_at)}</dd><dt>Đăng nhập cuối</dt><dd>${dt(a.last_login) || '—'}</dd><dt>Link</dt><dd><code>${location.origin}/?ref=${esc(a.code)}</code></dd></dl></div>
       <div class="card">${form([
@@ -716,7 +718,7 @@
   // ================================================================ Cài đặt
   VIEWS.settings = async (el) => {
     const s = await api('/settings'); SETTINGS = s;
-    const shop = s.shop || {}, ship = s.shipping || {}, pay = s.payment || {}, aff = s.affiliate || {}, seo = s.seo || {};
+    const shop = s.shop || {}, ship = s.shipping || {}, pay = s.payment || {}, aff = s.affiliate || {}, seo = s.seo || {}, auth = s.auth || {};
     const isAdmin = ME.role === 'admin';
     el.innerHTML = `
       <div class="g2">
@@ -744,6 +746,17 @@
         <div class="tbl-wrap"><table class="t" id="tiers"><thead><tr><th>Hạng</th><th>Doanh số tháng từ (đ)</th><th>Trực tiếp %</th><th>Gián tiếp 1 %</th><th>Gián tiếp 2 %</th></tr></thead><tbody>${(aff.tiers || []).map((t) => `<tr data-id="${t.id}"><td><input class="inp" data-k="name" value="${esc(t.name)}" /></td><td><input class="inp" type="number" data-k="min_sales" value="${t.min_sales}" /></td><td><input class="inp" type="number" step="any" data-k="direct" value="${t.direct}" /></td><td><input class="inp" type="number" step="any" data-k="l1" value="${t.l1}" /></td><td><input class="inp" type="number" step="any" data-k="l2" value="${t.l2}" /></td></tr>`).join('')}</tbody></table></div>
         <div style="margin-top:10px">${form([{ k: 'hold_days', l: 'Giữ hoa hồng sau khi giao (ngày)', t: 'number', s: 2 }, { k: 'min_withdraw', l: 'Rút tối thiểu (đ)', t: 'number', s: 2 }, { k: 'payout_days', l: 'Ngày chi trả', s: 2 }, { k: 'cookie_days', l: 'Lưu link giới thiệu (ngày)', t: 'number', s: 2 }, { k: 'buyer_discount_pct', l: 'Khách nhập mã CTV được giảm (%)', t: 'number', s: 2 }, { k: 'lifetime_binding', l: 'Khách gắn trọn đời với CTV đầu tiên', t: 'check', s: 2 }, { k: 'auto_approve', l: 'Tự duyệt CTV mới', t: 'check', s: 2 }], aff)}</div>
       </div>
+      <div class="card" id="sAuth"><h2>Tài khoản & xác thực SĐT ${s.status.otp ? '<span class="badge b-green">Gửi OTP sẵn sàng</span>' : '<span class="badge b-sun">Chưa cấu hình gửi OTP</span>'}</h2>
+        <p class="muted small">Khách đặt hàng không cần đăng nhập. Khi bật, khách tạo tài khoản và/hoặc đăng ký CTV phải nhập mã OTP gửi qua Zalo (ZNS) hoặc SMS. Nhà cung cấp: <a href="https://esms.vn" target="_blank" rel="noopener">eSMS.vn</a> (một tài khoản gửi được cả Zalo ZNS và SMS brandname). Công tắc chỉ có hiệu lực khi đã cấu hình gửi OTP. Khi chưa bật OTP, khách chưa xác thực chỉ xem được tóm tắt đơn cũ (ẩn địa chỉ).</p>
+        <div id="sAuthMain">${form([{ k: 'otp_signup', l: 'Bắt buộc OTP khi tạo tài khoản khách', t: 'check', s: 3 }, { k: 'otp_affiliate', l: 'Bắt buộc OTP khi đăng ký CTV', t: 'check', s: 3 },
+          { k: 'channel', l: 'Kênh gửi', t: 'select', s: 2, o: [['zalo_sms', 'Zalo trước, lỗi thì SMS'], ['zalo', 'Chỉ Zalo ZNS'], ['sms', 'Chỉ SMS']] }, { k: 'ttl_minutes', l: 'Mã hết hạn sau (phút)', t: 'number', s: 2 }, { k: 'policy_version', l: 'Phiên bản chính sách CTV', s: 2, h: 'Đổi khi sửa chính sách để ghi nhận CTV đồng ý bản nào' }], auth)}</div>
+        <h3 style="margin-top:14px">eSMS</h3>
+        <div id="sEsms">${form([{ k: 'brandname', l: 'Brandname SMS', s: 2, get: (v) => v.esms?.brandname, h: 'Tên thương hiệu đã đăng ký với eSMS' }, { k: 'oa_id', l: 'Zalo OA ID', s: 2, get: (v) => v.esms?.oa_id }, { k: 'zns_template_id', l: 'Mã mẫu ZNS OTP', s: 2, get: (v) => v.esms?.zns_template_id, h: 'Mẫu ZNS có 1 tham số là mã OTP' },
+          { k: 'sms_template', l: 'Nội dung SMS (không dấu, {otp} và {ttl} sẽ được thay)', s: 6, get: (v) => v.esms?.sms_template, h: 'Phải khớp mẫu đã đăng ký với nhà mạng' }, { k: 'sandbox', l: 'Chế độ Sandbox (eSMS nhận lệnh nhưng không gửi thật)', t: 'check', s: 6, get: (v) => v.esms?.sandbox }], auth)}</div>
+        <div class="form" style="margin-top:8px"><div class="f s2"><label>ApiKey ${s.secrets.esms_api_key ? `(đang dùng ${esc(s.secrets.esms_api_key)})` : ''}</label><input id="kEsmsA" type="password" autocomplete="off" placeholder="Dán ApiKey" /></div><div class="f s2"><label>SecretKey ${s.secrets.esms_secret_key ? `(đang dùng ${esc(s.secrets.esms_secret_key)})` : ''}</label><input id="kEsmsS" type="password" autocomplete="off" placeholder="Dán SecretKey" /></div>
+          <div class="f s1"><label>SĐT nhận thử</label><input id="otpPhone" inputmode="tel" placeholder="09…" /></div><div class="f s1" style="align-self:end"><button class="btn ghost sm" id="otpTest">Lưu & gửi thử</button></div></div>
+        <details style="margin-top:10px" id="otpLogBox"><summary class="muted small">Nhật ký gửi OTP gần đây</summary><div id="otpLog" class="small" style="margin-top:8px"></div></details>
+      </div>
       <div class="card" id="sSeo"><h2>SEO & đo lường</h2>${form([{ k: 'title', l: 'Tiêu đề trang chủ' }, { k: 'description', l: 'Mô tả trang chủ', t: 'textarea', rows: 2 }, { k: 'keywords', l: 'Từ khoá' }, { k: 'og_image', l: 'Ảnh chia sẻ (OG)', s: 3 }, { k: 'ga4', l: 'GA4 Measurement ID (G-XXXX)', s: 3 }, { k: 'gsc_verify', l: 'Mã xác minh Search Console', s: 2 }, { k: 'fb_pixel', l: 'Meta Pixel ID', s: 2 }, { k: 'tiktok_pixel', l: 'TikTok Pixel ID', s: 2 }, { k: 'head_extra', l: 'Mã chèn thêm vào <head>', t: 'textarea', rows: 2 }], seo)}</div>
       ${isAdmin ? '<div class="actions" style="position:sticky;bottom:10px"><button class="btn sun" id="saveS">💾 Lưu tất cả cài đặt</button></div>' : '<p class="muted">Chỉ quản trị viên được sửa cài đặt.</p>'}
       <div class="card" style="margin-top:16px" id="users"><h2>Người dùng quản trị</h2><div id="ulist"></div></div>`;
@@ -766,6 +779,25 @@
       const r = await api('/integrations/thuchi/test', { method: 'POST' });
       toast(r.ok ? `Kết nối SePay OK${r.accounts ? ' · ' + r.accounts + ' tài khoản' : ''}` : 'Chưa kết nối được: ' + (r.error || ''), !r.ok);
     }));
+    $('#otpTest').addEventListener('click', (e) => act(e.target, async () => {
+      await saveAll(true);
+      const ka = $('#kEsmsA').value.trim(), ks = $('#kEsmsS').value.trim();
+      if (ka) await api('/settings/secret', { method: 'POST', body: { key: 'esms_api_key', value: ka } });
+      if (ks) await api('/settings/secret', { method: 'POST', body: { key: 'esms_secret_key', value: ks } });
+      const ph = $('#otpPhone').value.trim();
+      if (!ph) { toast('Đã lưu. Nhập SĐT để gửi thử'); return; }
+      const r = await api('/integrations/otp/test', { method: 'POST', body: { phone: ph } });
+      toast(`Đã gửi mã thử qua ${r.channel === 'zalo' ? 'Zalo' : r.channel === 'sms' ? 'SMS' : r.channel}${r.dev_code ? ' · mã ' + r.dev_code : ''}`);
+      loadOtpLog();
+    }));
+    const loadOtpLog = async () => {
+      const rows = await api('/otp-log').catch(() => []);
+      const P = { signup: 'Tạo tài khoản', affiliate: 'Đăng ký CTV', reset: 'Quên mật khẩu', test: 'Gửi thử' };
+      const S = { sent: 'Đã gửi', verified: 'Đã xác thực', failed: 'Lỗi', expired: 'Hết hạn', sending: 'Đang gửi' };
+      $('#otpLog').innerHTML = table([{ h: 'Lúc', f: (r) => dt(r.created_at) }, { h: 'SĐT', k: 'phone' }, { h: 'Mục đích', f: (r) => esc(P[r.purpose] || r.purpose) }, { h: 'Kênh', f: (r) => esc(r.channel || '—') },
+        { h: 'Trạng thái', f: (r) => `${esc(S[r.status] || r.status)}${r.error ? `<div class="muted small">${esc(r.error)}</div>` : ''}` }, { h: 'Nhập sai', num: 1, k: 'attempts' }], rows.slice(0, 50));
+    };
+    $('#otpLogBox').addEventListener('toggle', (e) => { if (e.target.open) loadOtpLog(); });
     $('#gDo').addEventListener('click', (e) => act(e.target, async () => { await api('/integrations/goship/login', { method: 'POST', body: { ...readForm($('#gLogin')), goship_env: $('#sShip [name=goship_env]').value } }); await saveAll(true); toast('Đã kết nối Goship'); route(); }));
     $('#gTokSave').addEventListener('click', (e) => act(e.target, async () => { await api('/settings/secret', { method: 'POST', body: { key: 'goship_token', value: $('#gTok').value.trim() } }); toast('Đã lưu token'); route(); }));
     $('#gTest').addEventListener('click', (e) => act(e.target, async () => { const r = await api('/integrations/goship/test', { method: 'POST' }); toast(`Goship OK · ${r.cities} tỉnh/thành`); }));
@@ -783,6 +815,7 @@
         shipping: { ...ship, ...readForm($('#sShip > .form')), origin: { ...readForm($('#sOrigin')), city_name: $('#oCity').selectedOptions[0]?.text || '', district_name: $('#oDist').selectedOptions[0]?.text || '', ward_name: $('#oWard').selectedOptions[0]?.text || '' } },
         affiliate: { ...aff, ...readForm($('#sAff .form')), tiers },
         seo: { ...seo, ...readForm($('#sSeo')) },
+        auth: (() => { const a = { ...auth, ...readForm($('#sAuthMain')) }; a.ttl_minutes = Number(a.ttl_minutes) || 5; a.esms = { ...(auth.esms || {}), ...readForm($('#sEsms')) }; return a; })(),
       };
       await api('/settings', { method: 'PUT', body });
       if (!quiet) toast('Đã lưu cài đặt');

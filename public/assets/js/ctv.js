@@ -1,4 +1,4 @@
-// Cổng cộng tác viên: đăng ký, đăng nhập, ví hoa hồng, đội nhóm, rút tiền
+// Cổng cộng tác viên: đăng nhập bằng tài khoản khách, hồ sơ đăng ký CTV, ví hoa hồng, đội nhóm, rút tiền
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -17,31 +17,58 @@
   }
   function busy(form, on) { const b = $('button:not([type=button])', form); if (b) { b.disabled = on; b.style.opacity = on ? .6 : ''; } }
 
-  // ---------- khách
-  $$('[data-auth]').forEach((b) => b.addEventListener('click', () => {
-    $$('[data-auth]').forEach((x) => x.classList.toggle('on', x === b));
-    $('#regForm').hidden = b.dataset.auth !== 'reg';
-    $('#loginForm').hidden = b.dataset.auth !== 'login';
-  }));
-  if (!$('#rRef').value) { try { const r = JSON.parse(localStorage.getItem('dala_ref') || 'null'); if (r && r.code) $('#rRef').value = r.code; } catch (_) {} }
+  // ---------- khách: đăng nhập / tạo tài khoản khách, rồi điền hồ sơ CTV
+  const A = window.DalaAuth;
+  if (!$('#fRef').value) { try { const r = JSON.parse(localStorage.getItem('dala_ref') || 'null'); if (r && r.code) $('#fRef').value = r.code; } catch (_) {} }
+  $('#taxFromId').addEventListener('click', (e) => { e.preventDefault(); $('#fTax').value = $('#fId').value.replace(/\D/g, ''); });
+  let acct = null;
 
-  $('#regForm').addEventListener('submit', async (e) => {
-    e.preventDefault(); const f = e.currentTarget; busy(f, true);
+  function showApply(me) {
+    const c = me.customer;
+    $('#auth').innerHTML = `<h3 style="margin-top:0">Xin chào ${esc(c.name || c.phone)}</h3><p class="muted">Bạn đang đăng nhập bằng ${esc(c.phone)}. Điền hồ sơ bên dưới để trở thành cộng tác viên DaLa.</p><a class="btn sun block" href="#dang-ky">Điền hồ sơ đăng ký</a><p class="muted" style="font-size:.82rem;margin:10px 0 0"><a href="/tai-khoan">Xem đơn hàng của tôi</a> · <a href="#" id="swAcc">Đổi tài khoản</a></p>`;
+    $('#swAcc').addEventListener('click', async (e) => { e.preventDefault(); await A.api('/logout', {}).catch(() => {}); location.reload(); });
+    const f = $('#apply'); f.hidden = false;
+    if (!$('#fName').value) $('#fName').value = c.name || '';
+    if (!$('#fEmail').value) $('#fEmail').value = c.email || '';
+    if (!$('#fAddr').value) $('#fAddr').value = c.address || '';
+    if (!$('#fProv').value) $('#fProv').value = c.province || '';
+    const box = $('#fOtpBox');
+    if (me.flags.otp_affiliate && !c.phone_verified) {
+      const o = A.otpField('fOtp', 'affiliate', () => c.phone);
+      box.innerHTML = `<p class="muted" style="margin:0 0 6px">Xác thực số điện thoại ${esc(c.phone)} để hoàn tất đăng ký.</p>${o.html}`;
+      o.bind(box);
+    } else box.innerHTML = '';
+    if (location.hash === '#dang-ky') setTimeout(() => f.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  }
+
+  $('#apply').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.currentTarget;
+    if (!$('#fAgree').checked) { toast('Vui lòng xác nhận đã đọc và đồng ý chính sách cộng tác viên', true); $('#fAgree').focus(); return; }
+    busy(f, true);
     try {
-      const r = await api('/register', { method: 'POST', body: { name: $('#rName').value, phone: $('#rPhone').value, password: $('#rPass').value, province: $('#rProv').value, ref: $('#rRef').value.trim(), channel_note: $('#rNote').value } });
+      const r = await A.api('/affiliate', {
+        name: $('#fName').value, birth_date: $('#fBirth').value, id_number: $('#fId').value, email: $('#fEmail').value, address: $('#fAddr').value, province: $('#fProv').value,
+        channel_note: $('#fNote').value, ref: $('#fRef').value.trim(), bank_name: $('#fBank').value, bank_account: $('#fAcc').value, bank_holder: $('#fHolder').value,
+        tax_code: $('#fTax').value, agree_policy: true, otp: $('#fOtp') ? $('#fOtp').value : undefined,
+      });
       window.dalaTrack && window.dalaTrack('ctv_register', { code: r.code });
-      toast(r.status === 'pending' ? 'Đã đăng ký, DaLa sẽ duyệt trong 24 giờ' : 'Chào mừng bạn đến với DaLa!');
+      toast(r.status === 'pending' ? 'Đã gửi hồ sơ, DaLa sẽ duyệt trong 24 giờ' : 'Chào mừng bạn đến với DaLa!');
+      f.hidden = true;
       await load(true);
     } catch (err) { toast(err.message, true); } finally { busy(f, false); }
   });
-  $('#loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault(); const f = e.currentTarget; busy(f, true);
-    try { await api('/login', { method: 'POST', body: { phone: $('#lPhone').value, password: $('#lPass').value } }); await load(true); }
-    catch (err) { toast(err.message, true); } finally { busy(f, false); }
-  });
+
+  async function showGuest() {
+    $('#guest').hidden = false; $('#dash').hidden = true;
+    acct = await A.api('/me');
+    if (acct.guest) {
+      $('#apply').hidden = true;
+      A.mount($('#auth'), { flags: acct.flags, defaultTab: 'reg', intro: 'Bước 1: đăng nhập hoặc tạo tài khoản bằng số điện thoại. Bước 2: điền hồ sơ cộng tác viên.', onDone: () => { location.hash = 'dang-ky'; load(null); } });
+    } else showApply(acct);
+  }
 
   // ---------- bảng điều khiển
-  $('#logout').addEventListener('click', async () => { await api('/logout', { method: 'POST' }).catch(() => {}); location.reload(); });
+  $('#logout').addEventListener('click', async () => { await api('/logout', { method: 'POST' }).catch(() => {}); location.href = '/ctv'; });
   $$('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
     const v = $(b.dataset.copy).value;
     try { await navigator.clipboard.writeText(v); } catch (_) { $(b.dataset.copy).select(); document.execCommand('copy'); }
@@ -92,7 +119,7 @@
       `<p class="muted">Chưa có lệnh rút. Ngày chi trả: ${esc(d.policy.payout_days || 'định kỳ')}, tối thiểu ${vnd(d.policy.min_withdraw)}.</p>`;
 
     $('#pName').value = me.name || ''; $('#pEmail').value = me.email || ''; $('#pProv').value = me.province || '';
-    $('#pBank').value = me.bank_name || ''; $('#pAcc').value = me.bank_account || ''; $('#pHolder').value = me.bank_holder || '';
+    $('#pBank').value = me.bank_name || ''; $('#pAcc').value = me.bank_account || ''; $('#pHolder').value = me.bank_holder || ''; $('#pTax').value = me.tax_code || '';
   }
 
   async function loadOrders() {
@@ -157,7 +184,7 @@
   $('#profForm').addEventListener('submit', async (e) => {
     e.preventDefault(); const f = e.currentTarget; busy(f, true);
     try {
-      await api('/profile', { method: 'PUT', body: { name: $('#pName').value, email: $('#pEmail').value, province: $('#pProv').value, bank_name: $('#pBank').value, bank_account: $('#pAcc').value, bank_holder: $('#pHolder').value, password: $('#pOld').value, new_password: $('#pNew').value } });
+      await api('/profile', { method: 'PUT', body: { name: $('#pName').value, email: $('#pEmail').value, province: $('#pProv').value, bank_name: $('#pBank').value, bank_account: $('#pAcc').value, bank_holder: $('#pHolder').value, tax_code: $('#pTax').value, password: $('#pOld').value, new_password: $('#pNew').value } });
       $('#pOld').value = ''; $('#pNew').value = ''; toast('Đã lưu thông tin'); await load();
     } catch (err) { toast(err.message, true); } finally { busy(f, false); }
   });
@@ -165,13 +192,13 @@
   async function load(first) {
     try {
       data = await api('/me');
-      if (data.guest) { $('#guest').hidden = false; $('#dash').hidden = true; return; }
+      if (data.guest) { await showGuest(); return; }
       $('#guest').hidden = true; $('#dash').hidden = false;
       render(data);
       if (first !== false) { loadOrders().catch(() => {}); if (!$('#kit').children.length) loadKit(); }
       if (first === true) window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      if (err.status === 401) { $('#guest').hidden = false; $('#dash').hidden = true; }
+      if (err.status === 401) await showGuest().catch(() => {});
       else toast(err.message, true);
     }
   }
