@@ -261,6 +261,14 @@
       </dl>
       ${!o.goship_id && ['new', 'confirmed'].includes(o.status) ? `<div class="actions"><button class="btn sm sun" id="getRates">Lấy giá Goship & tạo vận đơn</button></div><div id="rates" class="rates" style="margin-top:10px"></div>` : ''}
       <div class="form" style="margin-top:10px"><div class="f s3"><label>Hãng (nhập tay)</label><input id="eCarrier" value="${esc(o.shipping_carrier || '')}" /></div><div class="f s3"><label>Mã vận đơn (nhập tay)</label><input id="eTrack" value="${esc(o.tracking_code || '')}" /></div></div></div>
+      <div class="card"><h3>Lịch sử đơn (khách xem được)</h3>
+        <dl class="kv"><dt>Dự kiến giao</dt><dd>${o.eta_from ? `${dd(o.eta_from)}${o.eta_to && o.eta_to !== o.eta_from ? ' – ' + dd(o.eta_to) : ''}` : '—'}</dd></dl>
+        <ol class="otl">${(o.timeline || []).slice().reverse().map((e) => `<li><span class="muted small">${dt(e.happened_at)}${e.source ? ' · ' + esc(e.source) : ''}${e.public ? '' : ' · <b>ẩn với khách</b>'}</span><div><b>${esc(e.title)}</b>${e.detail ? ' · ' + esc(e.detail) : ''}${e.location ? ' · 📍 ' + esc(e.location) : ''}</div></li>`).join('') || '<li class="muted">Chưa có mốc nào</li>'}</ol>
+        <div class="form" style="margin-top:10px"><div class="f s3"><label>Thêm cập nhật cho khách</label><input id="evT" placeholder="VD: Đã đóng gói, chờ hãng tới lấy" /></div><div class="f s3"><label>Chi tiết / vị trí (tuỳ chọn)</label><input id="evD" /></div>
+          <div class="f s2"><label>Đổi ngày dự kiến từ</label><input id="evF" type="date" value="${esc(o.eta_from || '')}" /></div><div class="f s2"><label>đến</label><input id="evTo" type="date" value="${esc(o.eta_to || '')}" /></div>
+          <label class="f s2 chk"><input type="checkbox" id="evP" checked /> Hiện cho khách</label></div>
+        <div class="actions"><button class="btn ghost sm" id="addEv">Thêm vào lịch sử</button></div>
+        <p class="muted small">Trạng thái từ Goship tự ghi vào đây khi đã cài webhook ở Cài đặt → Giao hàng.</p></div>
       ${o.commissions.length ? `<div class="card"><h3>Hoa hồng</h3>${table([{ h: 'Cấp', f: (r) => esc(r.level_name) }, { h: 'CTV', f: (r) => `${esc(r.name)} (${esc(r.code)})` }, { h: 'Doanh số', num: 1, f: (r) => vnd(r.base) }, { h: '%', num: 1, k: 'rate' }, { h: 'Hoa hồng', num: 1, f: (r) => `<b>${vnd(r.amount)}</b>` }, { h: 'Trạng thái', f: (r) => esc(r.status) + (r.available_at ? `<div class="muted small">khả dụng ${dd(r.available_at)}</div>` : '') }], o.commissions)}</div>` : ''}
       <div class="card"><h3>Xử lý</h3><div class="form">
         <div class="f s3"><label>Mã CTV gán cho đơn</label><input id="eAff" value="${esc(o.aff_code || '')}" placeholder="Để trống nếu không có" /></div>
@@ -270,6 +278,13 @@
       <p class="muted small">Huỷ hoặc hoàn hàng sẽ trả lại tồn kho, suất flash sale và huỷ hoa hồng chưa rút. Hoàn tất sẽ chuyển hoa hồng sang khả dụng sau thời gian giữ.</p></div>`);
     const refresh = () => { reload && reload().catch(() => {}); orderDetail(id, reload); };
     $('#markPaid', d)?.addEventListener('click', (e) => act(e.target, async () => { if (!confirm('Xác nhận đã nhận đủ ' + vnd(o.total) + '?')) return; await api('/orders/' + id, { method: 'PUT', body: { payment_status: 'paid' } }); toast('Đã ghi nhận thanh toán'); refresh(); }));
+    $('#addEv', d).addEventListener('click', (e) => act(e.target, async () => {
+      const title = $('#evT', d).value.trim(), from = $('#evF', d).value, to = $('#evTo', d).value;
+      const etaChanged = from && (from !== (o.eta_from || '') || to !== (o.eta_to || ''));
+      if (!title && !etaChanged) return toast('Nhập nội dung cập nhật hoặc đổi ngày dự kiến');
+      await api(`/orders/${id}/events`, { method: 'POST', body: { title: title || `DaLa cập nhật ngày giao dự kiến: ${from.split('-').reverse().join('/')}${to && to !== from ? ' – ' + to.split('-').reverse().join('/') : ''}`, detail: $('#evD', d).value, public: $('#evP', d).checked, eta_from: etaChanged ? from : undefined, eta_to: etaChanged ? (to || from) : undefined } });
+      toast('Đã cập nhật lịch sử đơn'); refresh();
+    }));
     $('#syncPay', d)?.addEventListener('click', (e) => act(e.target, async () => { const r = await api(`/orders/${id}/sync-payment`, { method: 'POST' }); toast(r.payment_status === 'paid' ? 'Đã nhận tiền ✓' : 'Chưa thấy tiền về'); refresh(); }));
     $('#getRates', d)?.addEventListener('click', (e) => act(e.target, async () => {
       const opts = await api(`/orders/${id}/rates`);
@@ -740,6 +755,9 @@
       <div class="card" id="sShip"><h2>Giao hàng ${s.status.goship ? '<span class="badge b-green">Goship đã kết nối</span>' : '<span class="badge b-sun">Goship chưa kết nối, đang dùng bảng phí dự phòng</span>'}</h2>
         ${form([{ k: 'free_threshold', l: 'Miễn phí ship từ (đ)', t: 'number', s: 2 }, { k: 'fragile_fee', l: 'Phụ phí hàng dễ vỡ (đ)', t: 'number', s: 2 }, { k: 'packaging_weight', l: 'Khối lượng bao bì (g)', t: 'number', s: 1 }, { k: 'fragile_padding_cm', l: 'Đệm chống sốc (cm)', t: 'number', s: 1 },
           { k: 'pick', l: 'Hãng mặc định cho khách', t: 'select', s: 3, o: [['cheapest', 'Rẻ nhất'], ['fastest', 'Nhanh nhất'], ['best', 'Tỷ lệ giao thành công cao nhất']] }, { k: 'goship_env', l: 'Môi trường Goship', t: 'select', s: 3, o: [['sandbox', 'Sandbox (thử)'], ['production', 'Thật']] }], ship)}
+        <h3 style="margin-top:14px">Ngày giao dự kiến</h3>
+        <p class="muted small">Khách thấy ngày giao dự kiến ở bước thanh toán và trang đơn = ngày gửi hàng + thời gian giao của hãng (Goship trả về, hoặc ${esc((ship.eta?.fallback_days || [2, 4]).join('–'))} ngày khi dùng bảng phí dự phòng).</p>
+        ${form([{ k: 'cutoff_hour', l: 'Đơn đặt trước (giờ) gửi trong ngày', t: 'number', s: 2, get: (v) => v.cutoff_hour ?? 15 }, { k: 'prep_days', l: 'Thời gian chuẩn bị thêm (ngày)', t: 'number', s: 2, get: (v) => v.prep_days ?? 0 }, { k: 'pickup_sunday', l: 'Gửi hàng cả Chủ nhật', t: 'check', s: 2 }], ship.eta || {}).replace('class="form"', 'class="form" id="sEta"')}
         <h3 style="margin-top:14px">Địa chỉ lấy hàng</h3>
         <div class="form" id="sOrigin"><div class="f s2"><label>Tên người gửi</label><input name="name" value="${esc(ship.origin?.name || '')}" /></div><div class="f s2"><label>SĐT</label><input name="phone" value="${esc(ship.origin?.phone || '')}" /></div><div class="f s2"><label>Số nhà, đường</label><input name="street" value="${esc(ship.origin?.street || '')}" /></div>
           <div class="f s2"><label>Tỉnh/TP</label><select name="city" id="oCity"><option value="">${s.status.goship ? 'Đang tải…' : 'Cần kết nối Goship'}</option></select></div><div class="f s2"><label>Quận/Huyện</label><select name="district" id="oDist"></select></div><div class="f s2"><label>Phường/Xã</label><select name="ward" id="oWard"></select></div></div>
@@ -832,7 +850,7 @@
       const body = {
         shop: { ...shop, ...readForm($('#sShop')) },
         payment: { ...pay, ...readForm($('#sPay > .form')), bank },
-        shipping: { ...ship, ...readForm($('#sShip > .form')), origin: { ...readForm($('#sOrigin')), city_name: $('#oCity').selectedOptions[0]?.text || '', district_name: $('#oDist').selectedOptions[0]?.text || '', ward_name: $('#oWard').selectedOptions[0]?.text || '' } },
+        shipping: { ...ship, ...readForm($('#sShip > .form')), eta: { ...(ship.eta || {}), ...readForm($('#sEta')) }, origin: { ...readForm($('#sOrigin')), city_name: $('#oCity').selectedOptions[0]?.text || '', district_name: $('#oDist').selectedOptions[0]?.text || '', ward_name: $('#oWard').selectedOptions[0]?.text || '' } },
         affiliate: { ...aff, ...readForm($('#sAff .form')), tiers },
         seo: { ...seo, ...readForm($('#sSeo')) },
         loyalty: { ...loy, ...readForm($('#sLoy')) },

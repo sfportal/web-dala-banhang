@@ -4,6 +4,7 @@
   const { api, mount, otpField, esc, toast } = window.DalaAuth;
   const vnd = (n) => Number(n || 0).toLocaleString('vi-VN') + 'đ';
   const date = (s) => (s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleDateString('vi-VN') : '');
+  const dtime = (s) => (s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '');
   const ST = { new: 'b-sun', confirmed: 'b-green', shipping: 'b-blue', completed: 'b-green', cancelled: 'b-gray', returned: 'b-gray' };
 
   async function load() {
@@ -77,6 +78,8 @@
         <header><div><b>${esc(r.code)}</b> <span class="muted">· ${date(r.created_at)}</span></div><span class="badge ${ST[r.status] || ''}">${esc(r.status_label)}</span></header>
         <ul>${r.items.map((i) => `<li><span>${esc(i.name)} × ${i.qty}</span><span>${vnd(i.price * i.qty)}</span></li>`).join('')}</ul>
         <footer><span class="muted">${esc(r.payment_label)}${r.payment_method === 'cod' ? ' · COD' : ''}${r.address ? ' · ' + esc(r.address) : ''}${r.tracking_code ? ` · Vận đơn ${r.tracking_url ? `<a href="${esc(r.tracking_url)}" target="_blank" rel="noopener">${esc(r.tracking_code)}</a>` : esc(r.tracking_code)}` : ''}</span><b>${vnd(r.total)}</b></footer>
+        ${r.eta ? `<div class="eta-line${r.eta.late ? ' late' : ''}">🚚 Dự kiến giao <b>${esc(r.eta.text)}</b>${r.ship_status_text ? ' · ' + esc(r.ship_status_text) : ''}</div>` : ''}
+        ${r.timeline && r.timeline.length ? `<details class="acc-track"><summary>Lịch sử đơn · ${esc(r.timeline[r.timeline.length - 1].title)}</summary><ol class="track">${r.timeline.slice().reverse().map((e, i) => `<li class="${i === 0 ? 'now' : ''}"><time>${esc(dtime(e.at))}</time><b>${esc(e.title)}</b>${e.detail ? `<div>${esc(e.detail)}</div>` : ''}${e.location ? `<div class="muted">📍 ${esc(e.location)}</div>` : ''}</li>`).join('')}</ol></details>` : ''}
         ${r.link ? `<a class="btn ghost sm" href="${esc(r.link)}">Xem chi tiết</a>` : ''}
       </article>`).join('') + (!o.verified ? `<p class="muted small">${d.flags.otp_available ? 'Xác thực số điện thoại ở trên để xem chi tiết từng đơn.' : 'Địa chỉ được ẩn bớt để bảo vệ thông tin. Liên hệ DaLa nếu cần chi tiết đơn.'}</p>` : '')
       : '<div class="panel"><p class="muted" style="margin:0">Chưa có đơn hàng nào với số điện thoại này. <a href="/san-pham">Mua sắm ngay</a></p></div>';

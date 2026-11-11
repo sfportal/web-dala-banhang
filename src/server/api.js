@@ -4,7 +4,8 @@ import { HttpError, json, readBody, normPhone, validPhone, hashPassword, verifyP
   slugify, toCsv, parseCsv, hmacSha256, parseJson } from '../lib/util.js';
 import { loadCatalog, priceCart, loadProducts, decorate, activeFlash, parseProduct } from '../lib/catalog.js';
 import { checkout, syncPayment, markPaid, setOrderStatus, ensureCommissions, upsertCustomer, refreshCustomerStats, recomputeTier,
-  STATUS_LABEL, PAY_LABEL, CHANNEL_LABEL, cronTick } from '../lib/orders.js';
+  STATUS_LABEL, PAY_LABEL, CHANNEL_LABEL, cronTick, logOrderEvent, orderTimeline } from '../lib/orders.js';
+import { estimateEta, fmtDay } from '../lib/eta.js';
 import { walletSummary, LEVEL_NAMES, tierById } from '../lib/commission.js';
 import { listCities, listDistricts, listWards, quoteShipping, createShipment, verifyGoshipWebhook, goshipLogin, goshipConfig, GOSHIP_STATUS, buildParcel } from '../lib/shipping.js';
 import { testConnection, thuchiConfig } from '../lib/payment.js';
@@ -93,6 +94,7 @@ async function publicApi(request, env, url, p, m, ctx) {
     const items = await all(env, 'SELECT i.sku, i.name, i.price, i.qty, p.image, p.slug FROM order_items i LEFT JOIN products p ON p.id=i.product_id WHERE order_id=?', o.id);
     const s = await getSettings(env);
     return json({
+      ...(await publicTracking(env, o, s)),
       code: o.code, status: o.status, status_label: STATUS_LABEL[o.status], payment_status: o.payment_status, payment_label: PAY_LABEL[o.payment_status],
       payment_method: o.payment_method, total: o.total, subtotal: o.subtotal, discount: o.discount, shipping_fee: o.shipping_fee, paid_amount: o.paid_amount,
       payment_code: o.payment_code, payment_qr: o.payment_qr, payment_account: o.payment_account, payment_bank: o.payment_bank, bank_holder: s.payment?.bank?.holder || null,
@@ -158,11 +160,38 @@ async function publicApi(request, env, url, p, m, ctx) {
   throw new HttpError(404, 'Không tìm thấy');
 }
 
+export function orderEta(o, settings) {
+  if (['completed', 'cancelled', 'returned'].includes(o.status)) return null;
+  let eta;
+  if (o.eta_from) { const to = o.eta_to || o.eta_from; eta = { from: o.eta_from, to, text: o.eta_from === to ? fmtDay(to) : `${fmtDay(o.eta_from)} – ${fmtDay(to)}` }; }
+  else eta = estimateEta(o.shipping_expected, settings?.shipping?.eta, Date.parse(String(o.created_at).replace(' ', 'T') + 'Z') || Date.now());
+  eta.late = eta.to < new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  return eta;
+}
+
+// Lịch sử đơn + ngày giao dự kiến cho khách xem
+export async function publicTracking(env, o, settings) {
+  let timeline = await orderTimeline(env, o.id);
+  if (!timeline.length || timeline[0].code !== 'new') timeline = [{ kind: 'status', code: 'new', title: 'Đặt hàng thành công', happened_at: o.created_at }, ...timeline];
+  const eta = orderEta(o, settings);
+  return {
+    eta,
+    timeline: timeline.map((e) => ({ kind: e.kind, code: e.code, title: e.title, detail: e.detail || null, location: e.location || null, source: e.source || null, at: e.happened_at })),
+  };
+}
+
 export async function getLot(env, code, countScan = false) {
   const lot = await first(env, `SELECT l.*, p.name product_name, p.subtitle product_subtitle, p.slug product_slug, p.image product_image, p.price product_price
     FROM lots l LEFT JOIN products p ON p.id=l.product_id WHERE l.code=?`, String(code).toUpperCase());
   if (lot && countScan) await run(env, 'UPDATE lots SET scans=scans+1 WHERE id=?', lot.id);
   return lot;
+}
+
+// Goship gửi giờ Việt Nam không kèm múi giờ ("2026-11-11 14:05:00"): đổi sang UTC để lưu
+function toSqlUtc(t) {
+  const s = String(t).replace(' ', 'T');
+  const ms = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? Date.parse(s) : Date.parse(s + '+07:00');
+  return Number.isFinite(ms) ? new Date(ms).toISOString().replace('T', ' ').slice(0, 19) : null;
 }
 
 async function goshipWebhook(request, env, url) {
@@ -179,6 +208,14 @@ async function goshipWebhook(request, env, url) {
   await run(env, `UPDATE orders SET ship_status=?, ship_status_text=?, tracking_code=COALESCE(?, tracking_code), tracking_url=COALESCE(?, tracking_url),
     goship_id=COALESCE(goship_id, ?), shipping_cost=COALESCE(?, shipping_cost), updated_at=datetime('now') WHERE id=?`,
   String(st), d.status_text || GOSHIP_STATUS[st] || null, d.code || null, d.tracking_url || null, d.gcode || null, Number(d.fee) || null, o.id);
+  // Ghi lịch sử giao nhận thực tế từ hãng (bỏ mốc đối soát nội bộ 909–912)
+  if (![909, 910, 911, 912].includes(st)) {
+    const where = d.location || d.current_location || d.address || d.hub || null;
+    const note = d.message || d.note || d.reason || d.status_desc || d.description || null;
+    const at = d.updated_at || d.time || d.created_at || null;
+    await logOrderEvent(env, o.id, { kind: 'ship', code: st, title: d.status_text || GOSHIP_STATUS[st] || 'Cập nhật vận chuyển', detail: note, location: where, source: 'goship',
+      at: at && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(at) ? toSqlUtc(at) : null });
+  }
   if ([902, 903, 904, 919].includes(st) && ['new', 'confirmed'].includes(o.status)) await setOrderStatus(env, o, 'shipping', 'Goship');
   else if ([905, 913].includes(st) && o.status !== 'completed') await setOrderStatus(env, o, 'completed', 'Goship');
   else if (st === 908 && o.status !== 'returned') await setOrderStatus(env, o, 'returned', 'Goship');
@@ -334,7 +371,21 @@ async function adminApi(request, env, url, p, m) {
     if (!o) throw new HttpError(404, 'Không tìm thấy đơn');
     const items = await all(env, 'SELECT * FROM order_items WHERE order_id=?', o.id);
     const comms = await all(env, 'SELECT c.*, a.name, a.code FROM commissions c JOIN affiliates a ON a.id=c.affiliate_id WHERE order_id=? ORDER BY level', o.id);
-    return json({ ...o, items, commissions: comms.map((c) => ({ ...c, level_name: LEVEL_NAMES[c.level] })), view_token: await orderToken(env, o.code) });
+    return json({ ...o, items, commissions: comms.map((c) => ({ ...c, level_name: LEVEL_NAMES[c.level] })), view_token: await orderToken(env, o.code),
+      timeline: await orderTimeline(env, o.id, { all: true }) });
+  }
+  if ((mm = p.match(/^\/orders\/(\d+)\/events$/)) && m === 'POST') {
+    const b = await readBody(request);
+    const o = await first(env, 'SELECT id FROM orders WHERE id=?', Number(mm[1]));
+    if (!o) throw new HttpError(404, 'Không tìm thấy đơn');
+    const title = String(b.title || '').trim();
+    if (title.length < 2) throw new HttpError(400, 'Nhập nội dung cập nhật');
+    await logOrderEvent(env, o.id, { kind: 'note', title, detail: String(b.detail || '').trim() || null, location: String(b.location || '').trim() || null, source: 'admin', isPublic: b.public !== false });
+    if (b.eta_from) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(b.eta_from) || (b.eta_to && !/^\d{4}-\d{2}-\d{2}$/.test(b.eta_to))) throw new HttpError(400, 'Ngày dự kiến không hợp lệ');
+      await run(env, 'UPDATE orders SET eta_from=?, eta_to=? WHERE id=?', b.eta_from, b.eta_to || b.eta_from, o.id);
+    }
+    return json({ ok: true });
   }
   if ((mm = p.match(/^\/orders\/(\d+)$/)) && m === 'PUT') {
     const b = await readBody(request);
@@ -342,6 +393,9 @@ async function adminApi(request, env, url, p, m) {
     if (!o) throw new HttpError(404, 'Không tìm thấy đơn');
     await run(env, `UPDATE orders SET tracking_code=?, shipping_carrier=?, admin_note=?, note=?, address=?, updated_at=datetime('now') WHERE id=?`,
       b.tracking_code ?? o.tracking_code, b.shipping_carrier ?? o.shipping_carrier, b.admin_note ?? o.admin_note, b.note ?? o.note, b.address ?? o.address, o.id);
+    if (b.tracking_code && b.tracking_code !== o.tracking_code) {
+      await logOrderEvent(env, o.id, { kind: 'ship', code: 'manual', title: `Đã bàn giao ${b.shipping_carrier || o.shipping_carrier || 'đơn vị vận chuyển'}`, detail: 'Mã vận đơn ' + b.tracking_code, source: 'admin' });
+    }
     if (b.affiliate_code !== undefined && b.affiliate_code !== (o.affiliate_id ? (await first(env, 'SELECT code FROM affiliates WHERE id=?', o.affiliate_id))?.code : '')) {
       const a = b.affiliate_code ? await first(env, 'SELECT id FROM affiliates WHERE code=?', String(b.affiliate_code).toUpperCase()) : null;
       if (b.affiliate_code && !a) throw new HttpError(400, 'Không tìm thấy mã CTV');
@@ -373,6 +427,8 @@ async function adminApi(request, env, url, p, m) {
     const d = await createShipment(env, o, b.rate_id);
     await run(env, `UPDATE orders SET goship_id=?, tracking_code=?, shipping_carrier=?, shipping_cost=?, ship_status=?, ship_status_text=?, updated_at=datetime('now') WHERE id=?`,
       d.id || null, d.tracking_number || null, d.carrier || o.shipping_carrier, Number(d.fee) || null, String(d.shipment_status || ''), d.shipment_status_txt || null, o.id);
+    await logOrderEvent(env, o.id, { kind: 'ship', code: 'created', title: `Đã tạo vận đơn ${d.carrier || o.shipping_carrier || ''}`.trim(),
+      detail: d.tracking_number ? 'Mã vận đơn ' + d.tracking_number : null, source: 'admin' });
     let o2 = await first(env, 'SELECT * FROM orders WHERE id=?', o.id);
     if (['new', 'confirmed'].includes(o2.status)) o2 = await setOrderStatus(env, o2, 'shipping', user.username);
     return json({ ok: true, shipment: d, order: o2 });

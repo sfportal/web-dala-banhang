@@ -5,10 +5,30 @@ import { priceCart, loadProducts } from './catalog.js';
 import { reservePoints, recordRedeem, onOrderStatus } from './loyalty.js';
 import { buildCommissions, commissionBase, tierFor } from './commission.js';
 import { createPaymentRequest, getPaymentRequest, thuchiConfig, manualQr } from './payment.js';
+import { estimateEta } from './eta.js';
 
 export const STATUS_LABEL = { new: 'Mới', confirmed: 'Đã xác nhận', shipping: 'Đang giao', completed: 'Hoàn tất', cancelled: 'Đã huỷ', returned: 'Hoàn hàng' };
 export const PAY_LABEL = { unpaid: 'Chưa thanh toán', partial: 'Thanh toán thiếu', paid: 'Đã thanh toán', refunded: 'Đã hoàn tiền' };
 export const CHANNEL_LABEL = { web: 'Website', ctv: 'Cộng tác viên', tiktok: 'TikTok Shop', shopee: 'Shopee', zalo: 'Zalo/Facebook', b2b: 'B2B/Quán', pos: 'Cửa hàng' };
+
+// Lời hiển thị cho khách ở lịch sử đơn
+export const STATUS_TITLE = { new: 'Đặt hàng thành công', confirmed: 'DaLa đã xác nhận đơn, đang chuẩn bị hàng', shipping: 'Đơn đang trên đường giao tới bạn',
+  completed: 'Giao hàng thành công', cancelled: 'Đơn đã huỷ', returned: 'Đơn hoàn về DaLa' };
+
+/** Ghi một mốc vào lịch sử đơn. Bỏ qua nếu trùng mốc gần nhất cùng loại và mã (webhook gửi lặp). */
+export async function logOrderEvent(env, orderId, { kind, code = null, title, detail = null, location = null, source = 'system', at = null, isPublic = true }) {
+  if (!orderId || !title) return;
+  const last = await first(env, 'SELECT kind, code, title FROM order_events WHERE order_id=? ORDER BY id DESC LIMIT 1', orderId).catch(() => null);
+  if (last && last.kind === kind && String(last.code ?? '') === String(code ?? '') && last.title === title && kind !== 'note') return;
+  await run(env, `INSERT INTO order_events (order_id, kind, code, title, detail, location, source, public, happened_at) VALUES (?,?,?,?,?,?,?,?,COALESCE(?, datetime('now')))`,
+    orderId, kind, code == null ? null : String(code), String(title).slice(0, 200), detail ? String(detail).slice(0, 500) : null,
+    location ? String(location).slice(0, 200) : null, source, isPublic ? 1 : 0, at).catch((e) => console.error('order_events', e.message));
+}
+
+export async function orderTimeline(env, orderId, { all: includePrivate = false } = {}) {
+  return all(env, `SELECT id, kind, code, title, detail, location, source, public, happened_at FROM order_events WHERE order_id=? ${includePrivate ? '' : 'AND public=1'}
+    ORDER BY happened_at ASC, id ASC`, orderId).catch(() => []);
+}
 
 async function newOrderCode(env) {
   for (let i = 0; i < 8; i++) {
@@ -88,20 +108,23 @@ export async function checkout(env, b, meta = {}) {
     settings.affiliate?.lifetime_binding !== false);
   const code = await newOrderCode(env);
   const sel = q.shipping.selected;
+  const eta = sel?.eta || estimateEta(sel?.expected, settings.shipping?.eta);
   // Điểm tích luỹ: trừ trước khi tạo đơn; giảm giá từ điểm cộng vào discount để hoa hồng tính trên tiền khách thực trả
   const pointsUsed = q.points?.used || 0;
   if (pointsUsed) await reservePoints(env, b.points_customer_id, pointsUsed);
   const r = await run(env, `INSERT INTO orders (code, channel, customer_id, name, phone, email, address, province, city_code, district_code, ward_code, district, ward, note,
       subtotal, discount, shipping_fee, total, voucher_code, affiliate_id, ref_source, payment_method, shipping_carrier, shipping_service, shipping_rate_id, shipping_expected,
-      shipping_cost, shop_pays_ship, parcel_weight, parcel_dims, fragile, utm_source, utm_medium, utm_campaign, session_id, points_used, points_discount)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      shipping_cost, shop_pays_ship, parcel_weight, parcel_dims, fragile, utm_source, utm_medium, utm_campaign, session_id, points_used, points_discount, eta_from, eta_to)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   code, aff ? 'ctv' : 'web', customerId, name, phone, b.email || null, address, to.province || to.city_name || null, to.city || null, to.district || null, to.ward || null,
   to.district_name || null, to.ward_name || null, String(b.note || '').slice(0, 500) || null,
   q.subtotal, q.discount + (q.points_discount || 0), q.shipping.fee, q.total, q.voucher, aff?.id || null, q.ref_source, method,
   sel?.carrier || null, sel?.service || null, sel?.id || null, sel?.expected || null, q.shipping.carrier_fee || null, q.shipping.shop_pays ? 1 : 0,
   q.parcel.weight, JSON.stringify(q.parcel), q.parcel.fragile ? 1 : 0,
-  meta.utm_source || null, meta.utm_medium || null, meta.utm_campaign || null, meta.sid || null, pointsUsed, q.points_discount || 0);
+  meta.utm_source || null, meta.utm_medium || null, meta.utm_campaign || null, meta.sid || null, pointsUsed, q.points_discount || 0, eta.from, eta.to);
   const orderId = r.meta.last_row_id;
+  await logOrderEvent(env, orderId, { kind: 'status', code: 'new', title: STATUS_TITLE.new,
+    detail: `${method === 'cod' ? 'Thanh toán khi nhận hàng' : 'Chờ thanh toán chuyển khoản'} · dự kiến giao ${eta.text}`, source: 'web' });
   if (pointsUsed) await recordRedeem(env, b.points_customer_id, { id: orderId, code, points_used: pointsUsed });
   await env.DB.batch(q.lines.map((l) => stmt(env, 'INSERT INTO order_items (order_id, product_id, sku, name, price, qty, flash_item_id, commissionable) VALUES (?,?,?,?,?,?,?,?)',
     orderId, l.product_id, l.sku, `${l.name} · ${l.subtitle || ''}`.replace(/ · $/, ''), l.price, l.qty, l.flash_item_id, l.commissionable)));
@@ -156,6 +179,8 @@ export async function markPaid(env, order, amount, by = 'admin') {
     status=CASE WHEN status='new' THEN 'confirmed' ELSE status END, updated_at=datetime('now'),
     admin_note=TRIM(IFNULL(admin_note,'') || ' ' || ?) WHERE id=?`, amount ?? order.total, `[${nowSql()}] Đã thanh toán (${by}).`, order.id);
   const o = await first(env, 'SELECT * FROM orders WHERE id=?', order.id);
+  await logOrderEvent(env, o.id, { kind: 'payment', code: 'paid', title: 'Đã nhận thanh toán', detail: Math.round(o.paid_amount || 0).toLocaleString('vi-VN') + 'đ', source: by === 'sepay' ? 'sepay' : 'admin' });
+  if (order.status === 'new' && o.status === 'confirmed') await logOrderEvent(env, o.id, { kind: 'status', code: 'confirmed', title: STATUS_TITLE.confirmed, source: 'system' });
   await ensureCommissions(env, o);
   return o;
 }
@@ -210,6 +235,9 @@ export async function setOrderStatus(env, order, status, by = 'admin') {
   const hold = Number(settings.affiliate?.hold_days ?? 7);
   await run(env, `UPDATE orders SET status=?, updated_at=datetime('now'), admin_note=TRIM(IFNULL(admin_note,'') || ' ' || ?) WHERE id=?`,
     status, `[${nowSql()}] ${STATUS_LABEL[order.status]} → ${STATUS_LABEL[status]} (${by}).`, order.id);
+  // Goship đã ghi mốc giao nhận riêng (đang giao, giao thành công) nên không ghi trùng
+  if (!(by === 'Goship' && ['shipping', 'completed'].includes(status))) await logOrderEvent(env, order.id, { kind: 'status', code: status, title: STATUS_TITLE[status],
+    detail: status === 'cancelled' && /quá hạn/.test(by) ? 'Quá hạn thanh toán' : null, source: by === 'Goship' ? 'goship' : /tự động/.test(by) ? 'system' : 'admin' });
   if (closing && !wasClosed) {
     await applyInventory(env, order, -1);
     await run(env, "UPDATE commissions SET status='void' WHERE order_id=? AND status!='void'", order.id);

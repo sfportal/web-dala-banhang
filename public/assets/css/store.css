@@ -640,3 +640,21 @@ body.cart-open .drawer-bg { opacity: 1; pointer-events: auto; }
 .promo { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1.5px dashed var(--sun, #f5b335); border-radius: 14px; margin-bottom: 10px; background: #fffaf0; }
 .promo code { font-weight: 800; font-size: 1rem; letter-spacing: .04em; }
 .promo small { display: block; color: var(--muted); }
+
+/* Lịch sử đơn + ngày giao dự kiến */
+.eta-pill { display: inline-block; margin: 12px auto 0; padding: 8px 16px; border-radius: 999px; background: var(--cream-2); font-size: .95rem; }
+.eta-box { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--cream-2); margin-bottom: 16px; font-size: 1.05rem; }
+.eta-box.late, .eta-line.late { background: #fff4e5; }
+.eta-line { margin: 8px 0; padding: 6px 10px; border-radius: 8px; background: var(--cream-2); font-size: .9rem; }
+.track { list-style: none; margin: 0; padding: 0 0 0 4px; }
+.track li { position: relative; padding: 0 0 18px 26px; border-left: 2px solid var(--line); margin-left: 6px; }
+.track li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.track li::before { content: ''; position: absolute; left: -7px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--line); border: 2px solid #fff; }
+.track li.now::before { background: var(--green); box-shadow: 0 0 0 4px rgba(46, 120, 39, .18); }
+.track li.now > b { color: var(--green); }
+.track time { display: block; font-size: .78rem; color: var(--muted); }
+.track b { display: block; }
+.track li > div { font-size: .9rem; }
+.acc-track { margin: 8px 0; }
+.acc-track summary { cursor: pointer; font-size: .9rem; color: var(--muted); }
+.acc-track .track { margin-top: 10px; }

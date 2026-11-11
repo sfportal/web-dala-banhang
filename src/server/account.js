@@ -9,7 +9,7 @@ import { sendOtp, verifyOtp, otpConfig } from '../lib/otp.js';
 import { STATUS_LABEL, PAY_LABEL } from '../lib/orders.js';
 import { loyaltyConfig } from '../lib/loyalty.js';
 import { activeFlash } from '../lib/catalog.js';
-import { orderToken } from './api.js';
+import { orderToken, publicTracking, orderEta } from './api.js';
 
 const BANK_RE = /^\d{6,20}$/;
 const TAX_RE = /^\d{10}(\d{2})?$|^\d{10}-\d{3}$/;
@@ -142,13 +142,17 @@ export async function accountApi(request, env, url, p, m) {
   }
 
   if (p === '/orders' && m === 'GET') {
-    const rows = await all(env, `SELECT id, code, created_at, status, payment_status, payment_method, total, shipping_fee, discount, address, province, tracking_code, tracking_url, ship_status_text
+    const rows = await all(env, `SELECT id, code, created_at, status, payment_status, payment_method, total, shipping_fee, discount, address, province, tracking_code, tracking_url, ship_status_text, shipping_expected, eta_from, eta_to
       FROM orders WHERE phone=? OR customer_id=? ORDER BY id DESC LIMIT 100`, me.phone, me.id);
     const items = rows.length ? await all(env, `SELECT order_id, name, qty, price FROM order_items WHERE order_id IN (${rows.map(() => '?').join(',')})`, ...rows.map((r) => r.id)) : [];
     const verified = !!me.phone_verified;
     const out = [];
-    for (const r of rows) {
+    const settings = await getSettings(env);
+    for (const [n, r] of rows.entries()) {
+      // Lịch sử chi tiết chỉ cho tài khoản đã xác thực SĐT, 20 đơn gần nhất
+      const tr = verified && n < 20 ? await publicTracking(env, r, settings) : { eta: orderEta(r, settings), timeline: null };
       out.push({
+        eta: tr.eta, timeline: tr.timeline,
         code: r.code, created_at: r.created_at, status: r.status, status_label: STATUS_LABEL[r.status], payment_status: r.payment_status, payment_label: PAY_LABEL[r.payment_status],
         payment_method: r.payment_method, total: r.total, shipping_fee: r.shipping_fee, discount: r.discount,
         address: verified ? [r.address, r.province].filter(Boolean).join(', ') : maskAddr(r.address),

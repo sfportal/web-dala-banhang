@@ -163,3 +163,6 @@ table.t { width: 100%; border-collapse: collapse; }
   .kv { grid-template-columns: 110px 1fr; }
   .hbar { grid-template-columns: 90px 1fr auto; }
 }
+.otl { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+.otl li { padding: 6px 0; border-bottom: 1px dashed var(--line, #e5e5e5); }
+.otl li:last-child { border-bottom: 0; }
