@@ -84,7 +84,7 @@
       rateId = sh.selected?.id || null;
       $('#shipOpts').innerHTML = sh.options.map((o) => `<label class="opt${o.id === rateId ? ' on' : ''}"><input type="radio" name="rate" value="${esc(o.id)}"${o.id === rateId ? ' checked' : ''}>
         ${o.logo ? `<img class="logo-c" src="${esc(o.logo)}" alt="">` : '<span style="font-size:1.4rem">🚚</span>'}
-        <div class="t"><b>${esc(o.carrier)} · ${esc(o.service || '')}</b><small>${esc(o.expected || '')}${o.success ? ` · giao thành công ${o.success}%` : ''}</small></div>
+        <div class="t"><b>${esc(o.carrier)} · ${esc(o.service || '')}</b><small>${o.eta ? `Dự kiến giao <span style="font-weight:700;color:var(--ink)">${esc(o.eta.text)}</span>` : esc(o.expected || '')}${o.success ? ` · giao thành công ${o.success}%` : ''}</small></div>
         <b>${sh.shop_pays ? '<s class="muted" style="font-weight:500">' + vnd(o.fee) + '</s> <span style="color:var(--green)">Miễn phí</span>' : vnd(o.fee)}</b></label>`).join('');
       document.querySelectorAll('input[name=rate]').forEach((r) => r.addEventListener('change', () => { rateId = r.value; refresh(true); }));
       const p = q.parcel || {};
@@ -101,6 +101,7 @@
       ${q.discount ? `<div class="sum-row" style="color:var(--green)"><span>${esc(q.discount_label || 'Giảm giá')}</span><b>−${vnd(q.discount)}</b></div>` : ''}
       ${q.points_discount ? `<div class="sum-row" style="color:var(--green)"><span>Đổi ${q.points.used.toLocaleString('vi-VN')} điểm</span><b>−${vnd(q.points_discount)}</b></div>` : ''}
       <div class="sum-row"><span>Phí giao hàng</span><b>${!t.province ? '—' : sh.shop_pays ? '<span style="color:var(--green)">Miễn phí</span>' : vnd(sh.fee)}</b></div>
+      ${t.province && sh.selected?.eta ? `<div class="sum-row"><span>Dự kiến giao</span><b>${esc(sh.selected.eta.text)}</b></div>` : ''}
       <div class="sum-row total"><span>Tổng cộng</span><span>${vnd(t.province ? q.total : after)}</span></div>`;
     $('#refNote').innerHTML = q.self_purchase ? `<div class="note-box">🤝 Đơn bạn tự mua với tư cách cộng tác viên${q.affiliate ? `: hoa hồng ghi nhận cho ${esc(q.affiliate.code)}` : ''}. Mã CTV không cộng thêm giảm giá cho đơn tự mua.</div>` :
       q.affiliate ? `<div class="note-box">🤝 Đơn được giới thiệu bởi cộng tác viên <b>${esc(q.affiliate.name)}</b> (${esc(q.affiliate.code)})</div>` : '';

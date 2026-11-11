@@ -19,6 +19,18 @@
       document.body.appendChild(c); setTimeout(() => c.remove(), 4800);
     }
   }
+  const SRC = { goship: 'Đơn vị vận chuyển', admin: 'DaLa', sepay: 'Ngân hàng', web: 'Website' };
+  const when = (t) => { const d = new Date(String(t).replace(' ', 'T') + (/[zZ+]/.test(t) ? '' : 'Z')); return isNaN(d) ? '' : d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }); };
+  function history(o) {
+    const ev = (o.timeline || []).slice().reverse();
+    if (!ev.length) return '';
+    return `<div class="panel"><h2>Lịch sử đơn hàng</h2>
+      ${o.eta ? `<div class="eta-box${o.eta.late ? ' late' : ''}">🚚 <span>Dự kiến giao <b>${esc(o.eta.text)}</b>${o.eta.late ? '<br><small>Đơn đang chậm hơn dự kiến, DaLa đang theo dõi với đơn vị vận chuyển.</small>' : ''}</span></div>` : ''}
+      <ol class="track">${ev.map((e, i) => `<li class="${i === 0 ? 'now' : ''} k-${esc(e.kind)}"><time>${esc(when(e.at))}</time><b>${esc(e.title)}</b>
+        ${e.detail ? `<div>${esc(e.detail)}</div>` : ''}${e.location ? `<div class="muted">📍 ${esc(e.location)}</div>` : ''}${e.source && SRC[e.source] && e.kind === 'ship' ? `<small class="muted">${SRC[e.source]}</small>` : ''}</li>`).join('')}</ol>
+      ${o.tracking_code ? `<p class="muted small" style="margin:10px 0 0">Mã vận đơn <b>${esc(o.tracking_code)}</b>${o.shipping_carrier ? ' · ' + esc(o.shipping_carrier) : ''}${o.tracking_url ? ` · <a href="${esc(o.tracking_url)}" target="_blank" rel="noopener">Xem trên trang hãng ↗</a>` : ''}</p>` : ''}
+    </div>`;
+  }
   function copy(text, btn) { navigator.clipboard?.writeText(text); btn.textContent = 'Đã chép'; setTimeout(() => (btn.textContent = 'Chép'), 1500); }
   window.dalaCopy = copy;
 
@@ -34,7 +46,7 @@
       const remain = o.total - (o.paid_amount || 0);
       const exp = new Date(o.created_at.replace(' ', 'T') + 'Z').getTime() + o.expire_minutes * 60000;
       head = `<h1 style="font-size:clamp(1.6rem,3.5vw,2.2rem);text-align:center">Quét mã để thanh toán đơn ${esc(o.code)}</h1>
-        <p class="muted" style="text-align:center">Mở app ngân hàng bất kỳ, quét mã VietQR. Hệ thống tự xác nhận khi tiền về, bạn không cần chụp màn hình.</p>
+        <p class="muted" style="text-align:center">${o.eta ? `Thanh toán ngay để nhận hàng dự kiến <b>${esc(o.eta.text)}</b>. ` : ''}Mở app ngân hàng bất kỳ, quét mã VietQR. Hệ thống tự xác nhận khi tiền về, bạn không cần chụp màn hình.</p>
         <div class="pay-grid" style="margin-top:24px">
           <div class="qr-box"><span class="pulse"></span>${o.payment_qr ? `<img src="${esc(o.payment_qr)}" alt="Mã VietQR thanh toán">` : '<div class="note-box">Chưa cấu hình tài khoản nhận tiền. DaLa sẽ liên hệ để xác nhận đơn.</div>'}</div>
           <div>
@@ -54,10 +66,10 @@
     } else {
       head = `<div class="success"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg></div>
         <h1 style="font-size:clamp(1.8rem,4vw,2.6rem)">${paid ? 'Thanh toán thành công!' : 'Đặt hàng thành công!'}</h1>
-        <p class="lead" style="margin:0 auto">Cảm ơn ${esc(o.name)}. Đơn <b>${esc(o.code)}</b> ${paid ? 'đã được thanh toán và' : 'sẽ được thu tiền khi giao, và'} đang được DaLa chuẩn bị.${o.shipping_expected ? ' ' + esc(o.shipping_expected) + '.' : ''}</p></div>`;
+        <p class="lead" style="margin:0 auto">Cảm ơn ${esc(o.name)}. Đơn <b>${esc(o.code)}</b> ${paid ? 'đã được thanh toán và' : 'sẽ được thu tiền khi giao, và'} ${o.status === 'shipping' ? 'đang trên đường giao tới bạn.' : 'đang được DaLa chuẩn bị.'}</p>${o.eta ? `<p class="eta-pill">🚚 Dự kiến giao <b>${esc(o.eta.text)}</b></p>` : ''}</div>`;
       if (!celebrated && (new URLSearchParams(location.search).get('new') || paid)) { celebrated = true; confetti(); }
     }
-    box.innerHTML = `<div class="panel">${head}${timeline}</div>
+    box.innerHTML = `<div class="panel">${head}${timeline}</div>${history(o)}
       <div class="panel"><h2>Chi tiết đơn ${esc(o.code)}</h2>${items}
         <div style="margin-top:12px"><div class="sum-row"><span>Tạm tính</span><b>${vnd(o.subtotal)}</b></div>
         ${o.discount ? `<div class="sum-row" style="color:var(--green)"><span>Giảm giá</span><b>−${vnd(o.discount)}</b></div>` : ''}

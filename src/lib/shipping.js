@@ -2,6 +2,7 @@
 // Tài liệu: https://doc.goship.io (rates, cities, districts, wards, shipments, webhooks)
 import { all, first, run, getSecret, getSetting, setSetting } from './db.js';
 import { HttpError, hmacSha256 } from './util.js';
+import { thuchiConfig, thuchiCall } from './payment.js';
 
 export const PROVINCES_34 = ['Hà Nội', 'TP. Hồ Chí Minh', 'Hải Phòng', 'Đà Nẵng', 'Cần Thơ', 'Huế', 'Đắk Lắk', 'Gia Lai', 'Lâm Đồng', 'Khánh Hòa',
   'Quảng Ngãi', 'Quảng Trị', 'Đồng Nai', 'Tây Ninh', 'Vĩnh Long', 'Đồng Tháp', 'An Giang', 'Cà Mau', 'Thanh Hóa', 'Nghệ An', 'Hà Tĩnh',
@@ -52,11 +53,26 @@ export function fallbackQuote(parcel, province, cfg = {}) {
 }
 
 // ---------------------------------------------------------------- Goship client
+// provider 'thuchi' (mặc định): gọi Goship qua API web Thu-Chi, không giữ token Goship ở website.
+// provider 'direct': gọi thẳng Goship bằng token (cách cũ).
 export async function goshipConfig(env) {
   const cfg = (await getSetting(env, 'shipping', {})) || {};
+  const provider = cfg.provider === 'direct' ? 'direct' : 'thuchi';
   const token = await getSecret(env, 'goship_token', 'GOSHIP_TOKEN');
   const base = cfg.goship_env === 'production' ? 'https://api.goship.io/api/v2' : 'https://sandbox.goship.io/api/v2';
-  return { cfg, token, base, enabled: !!token };
+  const enabled = provider === 'thuchi' ? (await thuchiConfig(env)).enabled : !!token;
+  return { cfg, token, base, provider, enabled, accountId: Number(cfg.thuchi_account_id) || undefined };
+}
+
+// Gọi Goship theo provider. path dạng Goship ('/cities', '/rates'…); body phẳng như API Thu-Chi.
+async function goship(env, path, { method = 'GET', body } = {}) {
+  const c = await goshipConfig(env);
+  if (c.provider === 'thuchi') {
+    const q = c.accountId && method === 'GET' ? (path.includes('?') ? '&' : '?') + 'account_id=' + c.accountId : '';
+    return thuchiCall(env, '/goship' + path + q, { method, body: body ? { ...body, account_id: c.accountId } : undefined });
+  }
+  const direct = path === '/rates' || path === '/shipments' ? { shipment: body } : body;
+  return gs(env, path, { method, body: direct });
 }
 
 const GOSHIP_BASE = { sandbox: 'https://sandbox.goship.io/api/v2', production: 'https://api.goship.io/api/v2' };
@@ -130,7 +146,7 @@ export async function listCities(env, { strict = false } = {}) {
   if (!enabled) return { source: 'static', items: STATIC_CITIES() };
   try {
     const items = await cached(env, 'cities', 30, async () => {
-      const list = listOf(await gs(env, '/cities')).map((c) => ({ id: String(c.id), name: c.name }));
+      const list = listOf(await goship(env, '/cities')).map((c) => ({ id: String(c.id), name: c.name }));
       if (!list.length) throw new HttpError(502, 'Goship trả về danh sách tỉnh trống');
       return list;
     });
@@ -142,10 +158,10 @@ export async function listCities(env, { strict = false } = {}) {
   }
 }
 export async function listDistricts(env, city) {
-  return cached(env, 'd:' + city, 30, async () => listOf(await gs(env, `/cities/${encodeURIComponent(city)}/districts`)).map((d) => ({ id: String(d.id), name: d.name })));
+  return cached(env, 'd:' + city, 30, async () => listOf(await goship(env, `/cities/${encodeURIComponent(city)}/districts`)).map((d) => ({ id: String(d.id), name: d.name })));
 }
 export async function listWards(env, district) {
-  return cached(env, 'w:' + district, 30, async () => listOf(await gs(env, `/districts/${encodeURIComponent(district)}/wards`)).map((w) => ({ id: String(w.id), name: w.name })));
+  return cached(env, 'w:' + district, 30, async () => listOf(await goship(env, `/districts/${encodeURIComponent(district)}/wards`)).map((w) => ({ id: String(w.id), name: w.name })));
 }
 
 export function normalizeRate(r, fragileFee = 0) {
@@ -162,17 +178,19 @@ export function normalizeRate(r, fragileFee = 0) {
  * to: { city, district, ward, province } ; cod: số tiền thu hộ ; amount: giá trị khai giá
  */
 export async function quoteShipping(env, parcel, to, { cod = 0, amount = 0 } = {}) {
-  const { cfg, enabled } = await goshipConfig(env);
+  const { cfg, enabled, provider } = await goshipConfig(env);
   const fragileFee = parcel.fragile ? Number(cfg.fragile_fee ?? 10000) : 0;
-  if (!enabled || !to?.district || !cfg.origin?.district) return fallbackQuote(parcel, to?.province || to?.city_name, cfg);
+  // Qua Thu-Chi có thể bỏ trống địa chỉ lấy hàng: dùng địa chỉ mặc định của tài khoản Goship bên Thu-Chi
+  const from = cfg.origin?.district ? { city: cfg.origin.city, district: cfg.origin.district, ward: cfg.origin.ward || undefined } : undefined;
+  if (!enabled || !to?.district || (!from && provider !== 'thuchi')) return fallbackQuote(parcel, to?.province || to?.city_name, cfg);
   try {
-    const d = await gs(env, '/rates', {
+    const d = await goship(env, '/rates', {
       method: 'POST',
-      body: { shipment: {
-        address_from: { city: cfg.origin.city, district: cfg.origin.district, ward: cfg.origin.ward || undefined },
+      body: {
+        address_from: from,
         address_to: { city: to.city, district: to.district, ward: to.ward || undefined },
         parcel: { cod: Math.round(cod), amount: Math.round(amount), weight: parcel.weight, width: parcel.width, height: parcel.height, length: parcel.length },
-      } },
+      },
     });
     const list = listOf(d).map((r) => normalizeRate(r, fragileFee)).filter((r) => r.id && r.fee > 0);
     if (!list.length) return fallbackQuote(parcel, to?.province, cfg);
@@ -186,24 +204,62 @@ export async function quoteShipping(env, parcel, to, { cod = 0, amount = 0 } = {
 
 // Tạo vận đơn Goship cho đơn hàng (rate phải lấy mới tại thời điểm tạo)
 export async function createShipment(env, order, rateId) {
-  const { cfg } = await goshipConfig(env);
+  const { cfg, provider } = await goshipConfig(env);
   const o = cfg.origin || {};
   const parcel = JSON.parse(order.parcel_dims || '{}');
   const cod = order.payment_method === 'cod' && order.payment_status !== 'paid' ? order.total : 0;
-  const d = await gs(env, '/shipments', {
+  const from = o.district ? { name: o.name, phone: o.phone, street: o.street, city: o.city, district: o.district, ward: o.ward } : undefined;
+  if (!from && provider !== 'thuchi') throw new HttpError(400, 'Chưa chọn địa chỉ lấy hàng ở Cài đặt → Giao hàng');
+  const d = await goship(env, '/shipments', {
     method: 'POST',
-    body: { shipment: {
-      rate: rateId, payer: 1, order_id: order.code,
-      address_from: { name: o.name, phone: o.phone, street: o.street, city: o.city, district: o.district, ward: o.ward },
+    body: {
+      rate: rateId, payer: 1, order_id: order.code, address_from: from,
       address_to: { name: order.name, phone: order.phone, street: order.address, city: order.city_code, district: order.district_code, ward: order.ward_code },
       parcel: {
         cod, amount: Math.min(order.subtotal, 5000000), weight: order.parcel_weight || parcel.weight || 500,
         width: parcel.width || 15, height: parcel.height || 10, length: parcel.length || 20,
         metadata: [order.fragile ? 'HÀNG DỄ VỠ, vui lòng nhẹ tay, không quăng ném.' : '', 'Cho xem hàng, không thử.', order.note || ''].filter(Boolean).join(' '),
       },
-    } },
+    },
   });
-  return d;
+  return normalizeShipment(d?.data && !d.gcode && !d.id ? d.data : d);
+}
+
+// Vận đơn về một dạng chung (Thu-Chi trả gcode/carrier_code/status; Goship trực tiếp trả id/tracking_number/shipment_status)
+export function normalizeShipment(d = {}) {
+  const status = d.status ?? d.shipment_status ?? null;
+  return {
+    gcode: d.gcode || d.id || null, tracking_number: d.carrier_code || d.tracking_number || null, carrier: d.carrier || d.carrier_name || null,
+    fee: Number(d.fee) || null, status: status == null || status === '' ? null : Number(status) || status, status_text: d.status_text || d.shipment_status_txt || null,
+    status_desc: d.status_desc || null, tracking_url: d.tracking_url || null, order_id: d.order_id || null, updated_at: d.updated_at || null,
+    carrier_error: d.carrier_error || null,
+  };
+}
+
+// Thu-Chi không gọi webhook về website: lấy các vận đơn thay đổi kể từ lần trước (chạy trong cron 5 phút)
+export async function listShipmentUpdates(env, since) {
+  const c = await goshipConfig(env);
+  if (c.provider !== 'thuchi' || !c.enabled) return { items: [], last: since };
+  const items = []; let last = since;
+  for (let page = 1; page <= 10; page++) {
+    const q = new URLSearchParams({ per_page: '100', page: String(page) });
+    if (since) q.set('updated_since', since);
+    if (c.accountId) q.set('account_id', String(c.accountId));
+    const { data, meta } = await thuchiCall(env, '/goship/shipments?' + q, { withMeta: true });
+    for (const s of data || []) { items.push(normalizeShipment(s)); if (s.updated_at && (!last || s.updated_at > last)) last = s.updated_at; }
+    if (!meta?.pagination?.has_more) break;
+  }
+  return { items, last };
+}
+
+export async function getShipment(env, gcode, refresh = false) {
+  const c = await goshipConfig(env);
+  if (c.provider !== 'thuchi') return null;
+  return normalizeShipment(await thuchiCall(env, `/goship/shipments/${encodeURIComponent(gcode)}${refresh ? '?refresh=1' : ''}`));
+}
+
+export async function listGoshipAccounts(env) {
+  return thuchiCall(env, '/goship/accounts');
 }
 
 // Goship ký webhook bằng HMAC-SHA256(json_encode(data), client_secret) dạng base64.

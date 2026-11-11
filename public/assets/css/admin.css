@@ -163,3 +163,10 @@ table.t { width: 100%; border-collapse: collapse; }
   .kv { grid-template-columns: 110px 1fr; }
   .hbar { grid-template-columns: 90px 1fr auto; }
 }
+.otl { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+.otl li { padding: 6px 0; border-bottom: 1px dashed var(--line, #e5e5e5); }
+.otl li:last-child { border-bottom: 0; }
+.vlog details { border-bottom: 1px solid var(--line, #e5e5e5); padding: 8px 0; }
+.vlog summary { cursor: pointer; }
+.vlog ul { margin: 6px 0 0 18px; padding: 0; }
+.vlog li { margin: 2px 0; }

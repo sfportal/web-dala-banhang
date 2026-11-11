@@ -2,6 +2,7 @@
 import { all, first, getSettings } from './db.js';
 import { HttpError, normPhone, parseJson } from './util.js';
 import { buildParcel, quoteShipping } from './shipping.js';
+import { estimateEta } from './eta.js';
 import { loyaltyConfig, redeemPlan, earnFor } from './loyalty.js';
 
 const JSON_FIELDS = { benefits: [], badges: [], personas: [], combo_items: null };
@@ -197,7 +198,7 @@ export async function priceCart(env, input, { withShipping = true } = {}) {
   let shipping = { options: [], selected: null, fee: 0, shop_pays: false };
   if (withShipping && lines.length) {
     const cod = input.payment_method === 'cod' ? after : 0;
-    const options = await quoteShipping(env, parcel, input.to || {}, { cod, amount: after });
+    const options = (await quoteShipping(env, parcel, input.to || {}, { cod, amount: after })).map((o) => ({ ...o, eta: estimateEta(o.expected, ship.eta) }));
     const selected = options.find((o) => o.id === input.rate_id) || options[0] || null;
     const shopPays = freeship || freeByThreshold;
     shipping = { options, selected, fee: shopPays ? 0 : selected?.fee || 0, shop_pays: shopPays, carrier_fee: selected?.carrier_fee ?? selected?.fee ?? 0 };

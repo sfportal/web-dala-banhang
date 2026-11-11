@@ -9,6 +9,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write   # tạo tag và bản phát hành
+
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -43,6 +46,21 @@ jobs:
       - run: npm run build
       - name: Deploy Worker
         run: npx wrangler deploy
+      - name: Tạo bản phát hành trên GitHub (khi có phiên bản mới)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(node -p "require('./package.json').version")
+          if gh release view "v$V" >/dev/null 2>&1; then
+            echo "v$V đã có bản phát hành, chỉ deploy bản dựng #${{ github.run_number }}"
+          else
+            node scripts/release-notes.mjs "$V" > /tmp/notes.md || echo "- Bản dựng #${{ github.run_number }}" > /tmp/notes.md
+            gh release create "v$V" --target "$GITHUB_SHA" --title "v$V" --notes-file /tmp/notes.md
+          fi
+          {
+            echo "### Đã deploy v$V · bản dựng #${{ github.run_number }}"
+            echo "Commit: ${GITHUB_SHA::7}"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Cập nhật secret của Worker
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
