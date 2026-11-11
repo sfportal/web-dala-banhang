@@ -31,8 +31,8 @@ async function call(env, path, opts = {}) {
   const d = await r.json().catch(() => ({}));
   if (!r.ok || d.status !== 'success') {
     const msg = d.message || `Web thu chi lỗi HTTP ${r.status}`;
-    // 401/403: key sai hoặc thiếu quyền → báo rõ cho quản trị; 422/429 giữ nguyên để hiển thị
-    const code = r.status === 401 ? 502 : r.status === 403 ? 403 : [409, 422, 429].includes(r.status) ? r.status : 502;
+    // 401/403: key sai hoặc thiếu quyền → báo rõ cho quản trị; 404/409/422/429 giữ nguyên để nơi gọi phân biệt
+    const code = r.status === 401 ? 502 : r.status === 403 ? 403 : [404, 409, 422, 429].includes(r.status) ? r.status : 502;
     throw new HttpError(code, r.status === 403 ? `API key Thu-Chi chưa có quyền này: ${msg}` : msg);
   }
   if (opts.withMeta) return { data: d.data, meta: d.meta };

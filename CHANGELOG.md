@@ -3,6 +3,9 @@
 Mỗi lần gộp vào `main`, website tự deploy. Khi tăng `version` trong `package.json` và thêm mục tương ứng ở đây, lần deploy đó tự tạo bản phát hành `v<phiên bản>` trên GitHub.
 Quy ước: tính năng mới tăng số giữa (1.4.0 → 1.5.0), sửa lỗi tăng số cuối (1.5.0 → 1.5.1).
 
+## 1.7.1 – 11/11/2026
+- Sửa kiểm tra trạng thái tích hợp báo "Endpoint không tồn tại" cho cả 4 dịch vụ khi Thu-Chi đang chạy bản cũ chưa có /ping: giờ vẫn kiểm tra SePay, Goship, OTP qua các API sẵn có và nhắc deploy lại Thu-Chi.
+
 ## 1.7.0 – 11/11/2026
 - Chỉ kết nối qua hệ thống Thu-Chi: bỏ hẳn kết nối trực tiếp Goship (token, webhook) và eSMS (ApiKey/SecretKey).
 - Thẻ "Kết nối hệ thống Thu-Chi" trong Admin → Cài đặt: kiểm tra trạng thái tích hợp Thu-Chi, SePay, Goship, OTP, kèm môi trường Thật/Sandbox và lỗi cụ thể.
