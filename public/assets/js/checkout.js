@@ -18,26 +18,31 @@
     refresh();
   }));
 
-  async function getJson(u) { const r = await fetch(u); return r.json(); }
+  async function getJson(u) { try { const r = await fetch(u); const j = await r.json(); return j && typeof j === 'object' ? j : {}; } catch { return {}; } }
   function fill(sel, items, ph, val) {
     sel.innerHTML = `<option value="">${ph}</option>` + items.map((i) => `<option value="${esc(i.id)}"${String(i.id) === String(val) ? ' selected' : ''}>${esc(i.name)}</option>`).join('');
     sel.disabled = false;
   }
   async function loadCities() {
     const d = await getJson('/api/geo/cities');
-    geoSource = d.source;
-    fill($('#city'), d.items, 'Chọn tỉnh/thành', saved.city);
-    if (geoSource !== 'goship') {
-      $('#fDistrict').style.display = 'none'; $('#fWard').style.display = 'none';
-      $('#geo').style.gridTemplateColumns = '1fr';
-      $('#addrHint').textContent = '(ghi rõ phường/xã)';
-      $('#address').placeholder = 'Số nhà, đường, phường/xã';
-    } else if (saved.city) { await loadDistricts(saved.district); }
+    geoSource = d.source === 'goship' && (d.items || []).length ? 'goship' : 'static';
+    fill($('#city'), d.items || [], 'Chọn tỉnh/thành', saved.city);
+    if (geoSource !== 'goship') staticMode();
+    else if (saved.city) { await loadDistricts(saved.district); }
     refresh();
+  }
+  // Không có Goship (hoặc Goship lỗi): chỉ chọn tỉnh, ghi phường/xã vào địa chỉ, phí theo bảng dự phòng
+  function staticMode() {
+    geoSource = 'static';
+    $('#fDistrict').style.display = 'none'; $('#fWard').style.display = 'none';
+    $('#geo').style.gridTemplateColumns = '1fr';
+    $('#addrHint').textContent = '(ghi rõ phường/xã)';
+    $('#address').placeholder = 'Số nhà, đường, phường/xã';
   }
   async function loadDistricts(val) {
     const c = $('#city').value; if (!c) return;
     const d = await getJson('/api/geo/districts?city=' + encodeURIComponent(c));
+    if (!(d.items || []).length) { staticMode(); return; }
     fill($('#district'), d.items || [], 'Chọn quận/huyện', val);
     $('#ward').innerHTML = '<option value="">Chọn quận trước</option>'; $('#ward').disabled = true;
     if (val) await loadWards(saved.ward);

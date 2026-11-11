@@ -102,9 +102,18 @@ async function publicApi(request, env, url, p, m, ctx) {
     });
   }
 
-  if (p === '/api/geo/cities' && m === 'GET') return json(await listCities(env), 200, { 'cache-control': 'public, max-age=3600' });
-  if (p === '/api/geo/districts' && m === 'GET') return json({ items: await listDistricts(env, url.searchParams.get('city') || '') }, 200, { 'cache-control': 'public, max-age=3600' });
-  if (p === '/api/geo/wards' && m === 'GET') return json({ items: await listWards(env, url.searchParams.get('district') || '') }, 200, { 'cache-control': 'public, max-age=3600' });
+  if (p === '/api/geo/cities' && m === 'GET') {
+    const c = await listCities(env);
+    return json(c.error ? { source: c.source, items: c.items } : c, 200, { 'cache-control': c.error ? 'no-store' : 'public, max-age=3600' });
+  }
+  if (p === '/api/geo/districts' && m === 'GET') {
+    try { return json({ items: await listDistricts(env, url.searchParams.get('city') || '') }, 200, { 'cache-control': 'public, max-age=3600' }); }
+    catch (e) { return json({ items: [], error: e.message }); }
+  }
+  if (p === '/api/geo/wards' && m === 'GET') {
+    try { return json({ items: await listWards(env, url.searchParams.get('district') || '') }, 200, { 'cache-control': 'public, max-age=3600' }); }
+    catch (e) { return json({ items: [], error: e.message }); }
+  }
 
   if ((mm = p.match(/^\/api\/lot\/([A-Za-z0-9-]+)$/)) && m === 'GET') {
     const lot = await getLot(env, mm[1], true);
@@ -662,11 +671,10 @@ async function adminApi(request, env, url, p, m) {
   }
   if (p === '/integrations/goship/login' && m === 'POST') { need('admin'); await goshipLogin(env, await readBody(request)); return json({ ok: true }); }
   if (p === '/integrations/goship/test' && m === 'POST') {
-    const c = await listCities(env);
-    if (c.source !== 'goship') throw new HttpError(400, 'Chưa có token Goship');
+    if (!(await goshipConfig(env)).enabled) throw new HttpError(400, 'Chưa có token Goship');
     await run(env, "DELETE FROM geo_cache WHERE key='cities'");
-    const fresh = await listCities(env);
-    return json({ ok: true, cities: fresh.items.length });
+    const fresh = await listCities(env, { strict: true });
+    return json({ ok: true, cities: fresh.items.length, env: (await goshipConfig(env)).cfg.goship_env || 'sandbox' });
   }
   if (p === '/shipping/quote' && m === 'POST') {
     const b = await readBody(request);
