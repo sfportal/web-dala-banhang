@@ -10,13 +10,14 @@ import { parseChangelog } from '../lib/changelog.js';
 import BUILD from '../generated/build-info.json';
 import CHANGELOG from '../../CHANGELOG.md?raw';
 import { walletSummary, LEVEL_NAMES, tierById } from '../lib/commission.js';
-import { listCities, listDistricts, listWards, quoteShipping, createShipment, verifyGoshipWebhook, goshipLogin, goshipConfig, GOSHIP_STATUS, buildParcel, listGoshipAccounts } from '../lib/shipping.js';
+import { listCities, listDistricts, listWards, quoteShipping, createShipment, goshipConfig, GOSHIP_STATUS, buildParcel } from '../lib/shipping.js';
+import { integrationStatus } from '../lib/integrations.js';
 import { testConnection, thuchiConfig } from '../lib/payment.js';
 import { createSession, getSession, endSession } from '../lib/session.js';
 import { accountApi, linkedAffiliate } from './account.js';
-import { sendOtp, otpConfig, listOtpAccounts } from '../lib/otp.js';
+import { sendOtp, otpConfig } from '../lib/otp.js';
 import { adjustPoints } from '../lib/loyalty.js';
-import { applyShipmentUpdate, refreshOrderShipment } from '../lib/shiptrack.js';
+import { refreshOrderShipment } from '../lib/shiptrack.js';
 
 
 // Khoá ký link đơn hàng: ưu tiên secret APP_SECRET, nếu không có thì tự sinh một lần và lưu trong D1
@@ -158,7 +159,6 @@ async function publicApi(request, env, url, p, m, ctx) {
     return json({ ok: true });
   }
 
-  if (p === '/api/goship/webhook' && m === 'POST') return goshipWebhook(request, env, url);
   if (p === '/api/cron' && m === 'POST') {
     if (!env.CRON_KEY || request.headers.get('x-cron-key') !== env.CRON_KEY) throw new HttpError(403, 'forbidden');
     return json(await cronTick(env));
@@ -191,33 +191,6 @@ export async function getLot(env, code, countScan = false) {
     FROM lots l LEFT JOIN products p ON p.id=l.product_id WHERE l.code=?`, String(code).toUpperCase());
   if (lot && countScan) await run(env, 'UPDATE lots SET scans=scans+1 WHERE id=?', lot.id);
   return lot;
-}
-
-// Goship gửi giờ Việt Nam không kèm múi giờ ("2026-11-11 14:05:00"): đổi sang UTC để lưu
-function toSqlUtc(t) {
-  const s = String(t).replace(' ', 'T');
-  const ms = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? Date.parse(s) : Date.parse(s + '+07:00');
-  return Number.isFinite(ms) ? new Date(ms).toISOString().replace('T', ' ').slice(0, 19) : null;
-}
-
-async function goshipWebhook(request, env, url) {
-  const raw = await request.text();
-  const secret = await getSecret(env, 'goship_client_secret', 'GOSHIP_CLIENT_SECRET');
-  const ship = (await getSetting(env, 'shipping', {})) || {};
-  const okKey = ship.webhook_key && url.searchParams.get('key') === ship.webhook_key;
-  const okSig = await verifyGoshipWebhook(raw, request.headers.get('x-goship-hmac-sha256'), secret);
-  if (!okKey && !okSig) return json({ error: 'invalid signature' }, 401);
-  const d = parseJson(raw, {});
-  const o = await first(env, 'SELECT * FROM orders WHERE code=? OR goship_id=?', d.order_id || '', d.gcode || '');
-  if (!o) return json({ ok: true, ignored: true });
-  const at = d.updated_at || d.time || d.created_at || null;
-  await applyShipmentUpdate(env, o, {
-    gcode: d.gcode, tracking_number: d.code, status: d.status, status_text: d.status_text, tracking_url: d.tracking_url, fee: d.fee,
-    status_desc: d.message || d.note || d.reason || d.status_desc || d.description || null,
-    location: d.location || d.current_location || d.address || d.hub || null,
-    at: at && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(at) ? toSqlUtc(at) : null,
-  });
-  return json({ ok: true });
 }
 
 // ---------------------------------------------------------------- cộng tác viên
@@ -702,7 +675,7 @@ async function adminApi(request, env, url, p, m) {
       secrets[k.replace('secret:', '')] = v ? '••••' + String(v).slice(-4) : null;
     }
     const tc = await thuchiConfig(env); const gc = await goshipConfig(env); const oc = await otpConfig(env);
-    return json({ ...s, secrets, status: { thuchi: tc.enabled, goship: gc.enabled, otp: oc.ready }, webhook_url: `${url.origin}/api/goship/webhook` });
+    return json({ ...s, secrets, status: { thuchi: tc.enabled, goship: gc.enabled, otp: oc.ready } });
   }
   if (p === '/settings' && m === 'PUT') {
     need('admin');
@@ -728,21 +701,9 @@ async function adminApi(request, env, url, p, m) {
     need('admin');
     return json(await all(env, `SELECT id, phone, purpose, channel, provider, status, error, attempts, created_at, verified_at FROM otp_codes ORDER BY id DESC LIMIT 200`));
   }
-  if (p === '/integrations/goship/login' && m === 'POST') { need('admin'); await goshipLogin(env, await readBody(request)); return json({ ok: true }); }
-  if (p === '/integrations/goship/test' && m === 'POST') {
-    const gc = await goshipConfig(env);
-    if (!gc.enabled) throw new HttpError(400, gc.provider === 'thuchi' ? 'Chưa kết nối hệ thống Thu-Chi (nhập địa chỉ và API key ở mục Thanh toán)' : 'Chưa có token Goship');
+  if (p === '/integrations/status' && m === 'GET') {
     await run(env, "DELETE FROM geo_cache WHERE key='cities'");
-    const fresh = await listCities(env, { strict: true });
-    const after = await goshipConfig(env);
-    return json({ ok: true, cities: fresh.items.length, provider: after.provider, env: after.cfg.goship_env || 'sandbox' });
-  }
-  if (p === '/integrations/thuchi/accounts' && m === 'GET') {
-    const out = {};
-    if (!(await thuchiConfig(env)).enabled) return json({ goship: [], otp: [], goship_error: 'Chưa kết nối Thu-Chi', otp_error: 'Chưa kết nối Thu-Chi' });
-    try { out.goship = await listGoshipAccounts(env); } catch (e) { out.goship = []; out.goship_error = e.message; }
-    try { out.otp = await listOtpAccounts(env); } catch (e) { out.otp = []; out.otp_error = e.message; }
-    return json(out);
+    return json(await integrationStatus(env));
   }
   if (p === '/shipping/quote' && m === 'POST') {
     const b = await readBody(request);

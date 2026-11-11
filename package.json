@@ -1,6 +1,6 @@
 {
   "name": "dala-shop",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "description": "Website bán hàng DaLa + quản trị CRM/CSM, affiliate 3 tầng, SePay, Goship (Astro + Cloudflare Workers + D1)",

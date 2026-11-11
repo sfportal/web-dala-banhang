@@ -1,7 +1,7 @@
 // Phí giao hàng: Goship API v2 (tra cước mọi hãng trên tuyến) + bảng phí dự phòng khi chưa kết nối
-// Tài liệu: https://doc.goship.io (rates, cities, districts, wards, shipments, webhooks)
-import { all, first, run, getSecret, getSetting, setSetting } from './db.js';
-import { HttpError, hmacSha256 } from './util.js';
+// Tất cả gọi qua web Thu-Chi: https://sepay-thuchi.minhducuy.workers.dev/docs#goship
+import { all, first, run, getSetting } from './db.js';
+import { HttpError } from './util.js';
 import { thuchiConfig, thuchiCall } from './payment.js';
 
 export const PROVINCES_34 = ['Hà Nội', 'TP. Hồ Chí Minh', 'Hải Phòng', 'Đà Nẵng', 'Cần Thơ', 'Huế', 'Đắk Lắk', 'Gia Lai', 'Lâm Đồng', 'Khánh Hòa',
@@ -53,83 +53,21 @@ export function fallbackQuote(parcel, province, cfg = {}) {
 }
 
 // ---------------------------------------------------------------- Goship client
-// provider 'thuchi' (mặc định): gọi Goship qua API web Thu-Chi, không giữ token Goship ở website.
-// provider 'direct': gọi thẳng Goship bằng token (cách cũ).
+// Goship chỉ đi qua API web Thu-Chi (/api/v1/goship): website không giữ token Goship.
 export async function goshipConfig(env) {
   const cfg = (await getSetting(env, 'shipping', {})) || {};
-  const provider = cfg.provider === 'direct' ? 'direct' : 'thuchi';
-  const token = await getSecret(env, 'goship_token', 'GOSHIP_TOKEN');
-  const base = cfg.goship_env === 'production' ? 'https://api.goship.io/api/v2' : 'https://sandbox.goship.io/api/v2';
-  const enabled = provider === 'thuchi' ? (await thuchiConfig(env)).enabled : !!token;
-  return { cfg, token, base, provider, enabled, accountId: Number(cfg.thuchi_account_id) || undefined };
+  const enabled = (await thuchiConfig(env)).enabled && cfg.goship_enabled !== false;
+  return { cfg, provider: 'thuchi', enabled, accountId: Number(cfg.thuchi_account_id) || undefined };
 }
 
-// Gọi Goship theo provider. path dạng Goship ('/cities', '/rates'…); body phẳng như API Thu-Chi.
 async function goship(env, path, { method = 'GET', body } = {}) {
   const c = await goshipConfig(env);
-  if (c.provider === 'thuchi') {
-    const q = c.accountId && method === 'GET' ? (path.includes('?') ? '&' : '?') + 'account_id=' + c.accountId : '';
-    return thuchiCall(env, '/goship' + path + q, { method, body: body ? { ...body, account_id: c.accountId } : undefined });
-  }
-  const direct = path === '/rates' || path === '/shipments' ? { shipment: body } : body;
-  return gs(env, path, { method, body: direct });
+  const q = c.accountId && method === 'GET' ? (path.includes('?') ? '&' : '?') + 'account_id=' + c.accountId : '';
+  return thuchiCall(env, '/goship' + path + q, { method, body: body ? { ...body, account_id: c.accountId } : undefined });
 }
 
-const GOSHIP_BASE = { sandbox: 'https://sandbox.goship.io/api/v2', production: 'https://api.goship.io/api/v2' };
-
-async function gsRaw(base, token, path, method, body) {
-  let r;
-  try {
-    r = await fetch(base + path, {
-      method,
-      headers: { accept: 'application/json', 'content-type': 'application/json', authorization: `Bearer ${token}` },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch (e) {
-    throw new HttpError(502, `Không kết nối được Goship (${base.includes('sandbox') ? 'Sandbox' : 'Thật'}): ${e.message}`);
-  }
-  let data = null;
-  try { data = await r.json(); } catch { /* bỏ qua */ }
-  return { r, data };
-}
-
-async function gs(env, path, { method = 'GET', body } = {}) {
-  const { token, base, cfg } = await goshipConfig(env);
-  if (!token) throw new HttpError(503, 'Chưa kết nối Goship');
-  let { r, data } = await gsRaw(base, token, path, method, body);
-  // Token Goship chỉ dùng được ở môi trường đã cấp (Sandbox hoặc Thật). Bị từ chối xác thực thì thử
-  // môi trường còn lại; nếu được thì tự lưu lại môi trường đúng.
-  if (r.status === 401 || r.status === 403) {
-    const other = cfg.goship_env === 'production' ? 'sandbox' : 'production';
-    const alt = await gsRaw(GOSHIP_BASE[other], token, path, method, body);
-    if (alt.r.ok && alt.data?.status !== 'error') {
-      await setSetting(env, 'shipping', { ...cfg, goship_env: other });
-      ({ r, data } = alt);
-    }
-  }
-  if (!r.ok || (data && data.status === 'error')) {
-    const msg = data?.data?.errors ? Object.values(data.data.errors).flat().join('; ') : data?.message || data?.data?.error || `Goship lỗi HTTP ${r.status}`;
-    throw new HttpError(502, (r.status === 401 || r.status === 403) ? `Goship từ chối token (HTTP ${r.status}): ${msg}. Kiểm tra lại token hoặc đăng nhập lại.` : msg);
-  }
-  return data;
-}
-
-// Danh sách trả về có thể nằm ở data hoặc data.data tuỳ phiên bản API
+// Danh sách trả về có thể nằm ở data hoặc data.data
 const listOf = (d) => (Array.isArray(d?.data) ? d.data : Array.isArray(d?.data?.data) ? d.data.data : Array.isArray(d) ? d : []);
-
-// Đăng nhập lấy access_token (token sống ~10 năm), lưu vào settings
-export async function goshipLogin(env, { username, password, client_id, client_secret, goship_env }) {
-  const base = goship_env === 'production' ? 'https://api.goship.io/api/v2' : 'https://sandbox.goship.io/api/v2';
-  const r = await fetch(base + '/login', {
-    method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' },
-    body: JSON.stringify({ username, password, client_id: Number(client_id) || client_id, client_secret }),
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!d.access_token) throw new HttpError(400, d?.message || d?.data?.error || 'Đăng nhập Goship thất bại, kiểm tra lại thông tin');
-  await setSetting(env, 'secret:goship_token', d.access_token);
-  if (client_secret) await setSetting(env, 'secret:goship_client_secret', client_secret);
-  return true;
-}
 
 async function cached(env, key, days, loader) {
   const row = await first(env, 'SELECT data, updated_at FROM geo_cache WHERE key=?', key);
@@ -182,7 +120,7 @@ export async function quoteShipping(env, parcel, to, { cod = 0, amount = 0 } = {
   const fragileFee = parcel.fragile ? Number(cfg.fragile_fee ?? 10000) : 0;
   // Qua Thu-Chi có thể bỏ trống địa chỉ lấy hàng: dùng địa chỉ mặc định của tài khoản Goship bên Thu-Chi
   const from = cfg.origin?.district ? { city: cfg.origin.city, district: cfg.origin.district, ward: cfg.origin.ward || undefined } : undefined;
-  if (!enabled || !to?.district || (!from && provider !== 'thuchi')) return fallbackQuote(parcel, to?.province || to?.city_name, cfg);
+  if (!enabled || !to?.district || false) return fallbackQuote(parcel, to?.province || to?.city_name, cfg);
   try {
     const d = await goship(env, '/rates', {
       method: 'POST',
@@ -209,7 +147,6 @@ export async function createShipment(env, order, rateId) {
   const parcel = JSON.parse(order.parcel_dims || '{}');
   const cod = order.payment_method === 'cod' && order.payment_status !== 'paid' ? order.total : 0;
   const from = o.district ? { name: o.name, phone: o.phone, street: o.street, city: o.city, district: o.district, ward: o.ward } : undefined;
-  if (!from && provider !== 'thuchi') throw new HttpError(400, 'Chưa chọn địa chỉ lấy hàng ở Cài đặt → Giao hàng');
   const d = await goship(env, '/shipments', {
     method: 'POST',
     body: {
@@ -239,7 +176,7 @@ export function normalizeShipment(d = {}) {
 // Thu-Chi không gọi webhook về website: lấy các vận đơn thay đổi kể từ lần trước (chạy trong cron 5 phút)
 export async function listShipmentUpdates(env, since) {
   const c = await goshipConfig(env);
-  if (c.provider !== 'thuchi' || !c.enabled) return { items: [], last: since };
+  if (!c.enabled) return { items: [], last: since };
   const items = []; let last = since;
   for (let page = 1; page <= 10; page++) {
     const q = new URLSearchParams({ per_page: '100', page: String(page) });
@@ -253,26 +190,11 @@ export async function listShipmentUpdates(env, since) {
 }
 
 export async function getShipment(env, gcode, refresh = false) {
-  const c = await goshipConfig(env);
-  if (c.provider !== 'thuchi') return null;
   return normalizeShipment(await thuchiCall(env, `/goship/shipments/${encodeURIComponent(gcode)}${refresh ? '?refresh=1' : ''}`));
 }
 
 export async function listGoshipAccounts(env) {
   return thuchiCall(env, '/goship/accounts');
-}
-
-// Goship ký webhook bằng HMAC-SHA256(json_encode(data), client_secret) dạng base64.
-// json_encode của PHP thoát "/" và ký tự Unicode, nên thử cả vài cách mã hoá.
-export async function verifyGoshipWebhook(raw, header, secret) {
-  if (!secret || !header) return false;
-  let parsed; try { parsed = JSON.parse(raw); } catch { return false; }
-  const js = JSON.stringify(parsed);
-  const php = js.replace(/\//g, '\\/').replace(/[\u007f-￿]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
-  for (const s of [raw, js, php]) {
-    if ((await hmacSha256(secret, s, 'base64')) === header) return true;
-  }
-  return false;
 }
 
 export const GOSHIP_STATUS = {

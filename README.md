@@ -73,38 +73,25 @@ Các mục không bắt buộc:
 - Secret `APP_SECRET`. Nếu không đặt, hệ thống tự sinh và lưu trong D1.
 - Biến `SITE_URL` cho tên miền riêng.
 
-### Kết nối thanh toán và giao hàng (trong trang quản trị)
+### Kết nối hệ thống Thu-Chi (SePay, Goship, OTP)
 
-**SePay qua hệ thống Thu-Chi**
-1. Trong Thu-Chi, vào **Cài đặt → API keys** và tạo key có quyền ghi.
-2. Trong DaLa, vào **Quản trị → Cài đặt → Thanh toán**: nhập địa chỉ Thu-Chi và API key, rồi bấm "Lưu & kiểm tra".
-3. Khách quét mã VietQR. SePay báo tiền về cho Thu-Chi, DaLa đối soát mỗi 4 giây trên trang đơn và mỗi 5 phút bằng cron, rồi tự xác nhận đơn và tạo hoa hồng.
+Website chỉ kết nối qua API của hệ thống Thu-Chi (`/api/v1`). Không còn kết nối trực tiếp tới Goship hay eSMS, website cũng không giữ token Goship hay khoá eSMS.
 
-**Goship**
-1. Trong **Cài đặt → Giao hàng**, đăng nhập bằng tài khoản Goship kèm `client_id`/`client_secret`, hoặc dán access token.
-2. Chọn địa chỉ lấy hàng.
-3. Khai báo webhook `https://<tên-miền>/api/goship/webhook` trên Goship để cập nhật trạng thái vận đơn.
+1. Trong Thu-Chi, cấu hình tài khoản ngân hàng SePay, tài khoản Goship và eSMS (mỗi tài khoản có môi trường Thật hoặc Sandbox).
+2. Tạo API key trong Thu-Chi → API & tích hợp, cấp quyền **Tạo yêu cầu thanh toán**, **Goship** và **Xác minh SĐT**.
+3. Trong DaLa, vào **Quản trị → Cài đặt → Kết nối hệ thống Thu-Chi**: nhập địa chỉ Thu-Chi và API key, rồi bấm "Lưu & kiểm tra".
+4. Bảng trạng thái hiện từng dịch vụ (Thu-Chi, SePay, Goship, OTP): Hoạt động hay Lỗi, môi trường Thật/Sandbox, quyền của key, lần cuối nhận webhook SePay, tài khoản Goship có địa chỉ lấy hàng chưa, kênh Zalo/SMS của eSMS. Thông tin sức khoẻ và môi trường lấy từ `GET /api/v1/status` của Thu-Chi; Thu-Chi bản cũ chưa có API này thì bảng chỉ dựa vào danh sách tài khoản.
+5. Ở mục Giao hàng và Tài khoản & xác thực SĐT, chọn tài khoản Goship/eSMS muốn dùng (bỏ trống là tài khoản đầu tiên).
 
-Khi chưa kết nối Goship, website dùng bảng phí dự phòng theo khối lượng. Bảng này có phụ phí hàng dễ vỡ và giảm phí cho các tỉnh gần kho.
+Thanh toán: khách quét VietQR, SePay báo tiền về Thu-Chi, DaLa đối soát mỗi 4 giây trên trang đơn và mỗi 5 phút bằng cron, rồi tự xác nhận đơn và tạo hoa hồng.
 
-### Xác thực số điện thoại (OTP Zalo/SMS)
+Giao hàng: Thu-Chi không gọi webhook về website; cron 5 phút lấy vận đơn thay đổi (`updated_since`), trang đơn của khách hỏi lại nếu quá 10 phút chưa cập nhật. Khi chưa kết nối Goship, website dùng bảng phí dự phòng theo khối lượng.
 
-Dùng [eSMS.vn](https://esms.vn): một tài khoản gửi được cả Zalo ZNS và SMS brandname.
-1. Đăng ký eSMS, khai báo brandname SMS và mẫu tin OTP; kết nối Zalo OA và duyệt mẫu ZNS OTP (1 tham số là mã).
-2. Trong **Cài đặt → Tài khoản & xác thực SĐT**: nhập ApiKey, SecretKey, brandname, OA ID, mã mẫu ZNS, nội dung SMS, rồi bấm "Lưu & gửi thử".
-3. Bật công tắc "Bắt buộc OTP khi tạo tài khoản khách" và/hoặc "khi đăng ký CTV". Kênh mặc định: gửi Zalo trước, eSMS từ chối thì gửi SMS.
-
-Giới hạn chống spam: 60 giây giữa hai lần gửi, 5 mã/giờ mỗi số, 15 mã/giờ mỗi IP, mã hết hạn sau 5 phút, sai 5 lần phải gửi lại. Khi chạy trên máy (`localhost`) có thể đặt `provider` của cài đặt `auth` là `test` để nhận mã ngay trong phản hồi.
+OTP: bật "Bắt buộc OTP khi tạo tài khoản khách" và/hoặc "khi đăng ký CTV". Giới hạn chống spam: 60 giây giữa hai lần gửi, 5 mã/giờ mỗi số, 15 mã/giờ mỗi IP, mã hết hạn sau 5 phút, sai 5 lần phải gửi lại. Khi chạy trên máy (`localhost`) có thể đặt `provider` của cài đặt `auth` là `test` để nhận mã ngay trong phản hồi.
 
 ### Pixel và Search Console
 
 Vào **Cài đặt → SEO & đo lường** để nhập GA4, Meta Pixel, TikTok Pixel và mã xác minh Google Search Console.
-
-### Goship và OTP qua hệ thống Thu-Chi
-- Mặc định website gọi Goship (`/api/v1/goship/*`) và OTP (`/api/v1/otp/*`) qua web Thu-Chi, dùng chung địa chỉ và API key ở mục Thanh toán. API key cần thêm quyền **Goship** và **Xác minh SĐT** trong Thu-Chi → API & tích hợp.
-- Tài khoản Goship và eSMS cấu hình bên Thu-Chi; Admin → Cài đặt chọn tài khoản muốn dùng (bỏ trống là tài khoản đầu tiên).
-- Thu-Chi không gọi webhook về website: cron 5 phút lấy vận đơn thay đổi (`updated_since`), trang đơn của khách hỏi lại nếu quá 10 phút chưa cập nhật.
-- Kết nối trực tiếp (token Goship, khoá eSMS) vẫn chọn được trong admin.
 
 ### Phiên bản và nhật ký cập nhật
 - Phiên bản nằm ở `version` trong `package.json`, nhật ký ở `CHANGELOG.md`. Tính năng mới tăng số giữa, sửa lỗi tăng số cuối.
@@ -137,7 +124,7 @@ Giá, combo đề xuất, dữ liệu lô hàng và bài viết trong `migration
 
 ```
 src/lib/          commission.js (hoa hồng), catalog.js (giá, flash, giỏ), orders.js (đơn, thanh toán, cron),
-                  shipping.js (Goship + dự phòng), payment.js (SePay/Thu-Chi), db.js, util.js, content.js
+                  shipping.js (Goship qua Thu-Chi + dự phòng), integrations.js (trạng thái tích hợp), payment.js (SePay/Thu-Chi), db.js, util.js, content.js
 src/server/api.js API công khai, /api/aff/* (CTV), /api/admin/* (quản trị)
 src/pages/        trang cửa hàng (Astro), ctv.astro, admin.astro
 public/assets/    css, js (store, checkout, order, ctv, admin), ảnh sản phẩm đã tách nền

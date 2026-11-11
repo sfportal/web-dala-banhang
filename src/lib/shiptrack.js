@@ -1,5 +1,4 @@
-// Cập nhật trạng thái vận đơn vào đơn hàng: dùng chung cho webhook Goship (kết nối trực tiếp)
-// và đồng bộ định kỳ qua web Thu-Chi.
+// Cập nhật trạng thái vận đơn vào đơn hàng khi đồng bộ từ web Thu-Chi.
 import { first, run, getSetting, setSetting } from './db.js';
 import { setOrderStatus, logOrderEvent } from './orders.js';
 import { GOSHIP_STATUS, listShipmentUpdates, getShipment } from './shipping.js';
