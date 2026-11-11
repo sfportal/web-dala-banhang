@@ -170,3 +170,9 @@ table.t { width: 100%; border-collapse: collapse; }
 .vlog summary { cursor: pointer; }
 .vlog ul { margin: 6px 0 0 18px; padding: 0; }
 .vlog li { margin: 2px 0; }
+.int-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.int-row { border: 1px solid var(--line, #e5e5e5); border-left-width: 4px; border-radius: 10px; padding: 10px 12px; }
+.int-row.ok { border-left-color: #2e7827; }
+.int-row.bad { border-left-color: #c0392b; }
+.int-err { color: #c0392b; font-size: .85rem; margin: 4px 0; }
+.int-grid > p { grid-column: 1 / -1; }

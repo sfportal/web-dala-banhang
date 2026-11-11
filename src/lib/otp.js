@@ -1,34 +1,26 @@
 // Xác thực số điện thoại bằng OTP qua Zalo (ZNS) và SMS.
-// - provider 'thuchi' (mặc định): gửi và kiểm tra mã qua API web Thu-Chi (/api/v1/otp), website không giữ khoá eSMS
-// - provider 'esms': gọi thẳng eSMS.vn bằng khoá riêng (cách cũ); 'test': chỉ dùng trên máy phát triển
+// Gửi và kiểm tra mã chỉ qua API web Thu-Chi (/api/v1/otp); website không giữ khoá eSMS.
+// provider 'test' chỉ dùng trên máy phát triển (localhost).
 // - Kênh "zalo_sms": gửi ZNS trước, nếu eSMS từ chối thì gửi SMS brandname cùng mã
 // - Mã 6 số, lưu dạng băm, hết hạn sau ttl_minutes, tối đa 5 lần nhập sai
 // - Giới hạn: 60 giây giữa hai lần gửi, 5 lần/giờ mỗi số, 15 lần/giờ mỗi IP
-import { all, first, run, getSetting, getSecret } from './db.js';
+import { first, run, getSetting } from './db.js';
 import { HttpError, normPhone, validPhone } from './util.js';
 import { thuchiConfig, thuchiCall } from './payment.js';
 
-const ESMS = 'https://rest.esms.vn/MainService.svc/json';
 const MAX_ATTEMPTS = 5;
 export const OTP_PURPOSES = ['signup', 'affiliate', 'reset', 'test'];
 
 export const DEFAULT_AUTH = {
   otp_signup: false, otp_affiliate: false, channel: 'zalo_sms', provider: 'thuchi', thuchi_account_id: null, ttl_minutes: 5, policy_version: '2026-11',
-  esms: { brandname: '', oa_id: '', zns_template_id: '', sms_template: '{otp} la ma xac thuc tai khoan DaLa cua ban. Ma co hieu luc {ttl} phut.', sandbox: false },
 };
 
 export async function otpConfig(env) {
   const s = (await getSetting(env, 'auth', {})) || {};
-  const auth = { ...DEFAULT_AUTH, ...s, esms: { ...DEFAULT_AUTH.esms, ...(s.esms || {}) } };
-  const apiKey = await getSecret(env, 'esms_api_key', 'ESMS_API_KEY');
-  const secretKey = await getSecret(env, 'esms_secret_key', 'ESMS_SECRET_KEY');
-  const e = auth.esms;
-  const zaloOk = !!(e.oa_id && e.zns_template_id);
-  const smsOk = !!e.brandname;
-  const chan = auth.channel;
-  const channelsReady = chan === 'zalo' ? zaloOk : chan === 'sms' ? smsOk : (zaloOk || smsOk);
-  const ready = auth.provider === 'test' || (auth.provider === 'thuchi' ? (await thuchiConfig(env)).enabled : !!(apiKey && secretKey && channelsReady));
-  return { auth, apiKey, secretKey, ready, zaloOk, smsOk };
+  const auth = { ...DEFAULT_AUTH, ...s };
+  if (auth.provider !== 'test') auth.provider = 'thuchi';
+  const ready = auth.provider === 'test' || (await thuchiConfig(env)).enabled;
+  return { auth, ready };
 }
 
 // Có bắt buộc OTP cho mục đích này không (chỉ khi admin bật)
@@ -53,34 +45,6 @@ function salt() {
   const a = new Uint8Array(8);
   crypto.getRandomValues(a);
   return [...a].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function esmsPost(path, body) {
-  const r = await fetch(`${ESMS}/${path}/`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) });
-  const d = await r.json().catch(() => ({}));
-  return { ok: String(d.CodeResult) === '100', code: d.CodeResult, message: d.ErrorMessage || (r.ok ? '' : `HTTP ${r.status}`), id: d.SMSID };
-}
-
-async function sendViaEsms(cfg, phone, code, requestId) {
-  const e = cfg.auth.esms;
-  const ttl = String(cfg.auth.ttl_minutes || 5);
-  const base = { ApiKey: cfg.apiKey, SecretKey: cfg.secretKey, Phone: phone, Sandbox: e.sandbox ? '1' : '0', RequestId: requestId };
-  const order = cfg.auth.channel === 'zalo' ? ['zalo'] : cfg.auth.channel === 'sms' ? ['sms'] : ['zalo', 'sms'];
-  const errors = [];
-  for (const ch of order) {
-    if (ch === 'zalo' && cfg.zaloOk) {
-      const r = await esmsPost('SendZaloMessage_V4_post_json', { ...base, OAID: e.oa_id, TempID: e.zns_template_id, Params: [code], SendingMode: '1' });
-      if (r.ok) return { channel: 'zalo', ref: r.id };
-      errors.push(`Zalo: ${r.message || 'mã ' + r.code}`);
-    }
-    if (ch === 'sms' && cfg.smsOk) {
-      const content = String(e.sms_template || DEFAULT_AUTH.esms.sms_template).replace(/\{otp\}/g, code).replace(/\{ttl\}/g, ttl);
-      const r = await esmsPost('SendMultipleMessage_V4_post_json', { ...base, Content: content, Brandname: e.brandname, SmsType: '2', IsUnicode: '0' });
-      if (r.ok) return { channel: 'sms', ref: r.id };
-      errors.push(`SMS: ${r.message || 'mã ' + r.code}`);
-    }
-  }
-  throw new Error(errors.join(' · ') || 'Chưa cấu hình kênh gửi (OA Zalo + mẫu ZNS hoặc brandname SMS)');
 }
 
 const isLocal = (host) => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(host || '');
@@ -126,14 +90,7 @@ export async function sendOtp(env, { phone, purpose, ip, host, skipLimits = fals
     await run(env, "UPDATE otp_codes SET status='sent', channel='test' WHERE id=?", id);
     return { ok: true, channel: 'test', ttl, dev_code: code };
   }
-  try {
-    const s = await sendViaEsms(cfg, p, code, `dala-otp-${id}`);
-    await run(env, "UPDATE otp_codes SET status='sent', channel=? WHERE id=?", s.channel, id);
-    return { ok: true, channel: s.channel, ttl };
-  } catch (e) {
-    await run(env, "UPDATE otp_codes SET status='failed', error=? WHERE id=?", String(e.message).slice(0, 300), id);
-    throw new HttpError(502, purpose === 'test' ? `Gửi thất bại: ${e.message}` : 'Chưa gửi được mã xác thực, vui lòng thử lại sau ít phút');
-  }
+  throw new HttpError(503, 'Chưa cấu hình gửi mã xác thực');
 }
 
 // Kiểm tra mã; đúng thì đánh dấu đã dùng (mỗi mã dùng một lần)
