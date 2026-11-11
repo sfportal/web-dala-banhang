@@ -779,6 +779,11 @@
     const fill = async (sel, url, cur) => { try { const r = await fetch(url).then((x) => x.json()); const items = r.items || []; sel.innerHTML = '<option value="">—</option>' + items.map((i) => `<option value="${esc(i.id)}" ${String(i.id) === String(cur) ? 'selected' : ''}>${esc(i.name)}</option>`).join(''); } catch {} };
     if (s.status.goship) {
       await fill($('#oCity'), '/api/geo/cities', o.city);
+      const src = await fetch('/api/geo/cities').then((x) => x.json()).catch(() => ({}));
+      if (src.source !== 'goship') {
+        $('#oCity').innerHTML = '<option value="">Không tải được từ Goship</option>';
+        api('/integrations/goship/test', { method: 'POST' }).catch((e) => toast('Goship: ' + e.message, true));
+      }
       if (o.city) await fill($('#oDist'), '/api/geo/districts?city=' + o.city, o.district);
       if (o.district) await fill($('#oWard'), '/api/geo/wards?district=' + o.district, o.ward);
       $('#oCity').addEventListener('change', (e) => { $('#oWard').innerHTML = ''; fill($('#oDist'), '/api/geo/districts?city=' + e.target.value); });
@@ -815,7 +820,7 @@
     $('#otpLogBox').addEventListener('toggle', (e) => { if (e.target.open) loadOtpLog(); });
     $('#gDo').addEventListener('click', (e) => act(e.target, async () => { await api('/integrations/goship/login', { method: 'POST', body: { ...readForm($('#gLogin')), goship_env: $('#sShip [name=goship_env]').value } }); await saveAll(true); toast('Đã kết nối Goship'); route(); }));
     $('#gTokSave').addEventListener('click', (e) => act(e.target, async () => { await api('/settings/secret', { method: 'POST', body: { key: 'goship_token', value: $('#gTok').value.trim() } }); toast('Đã lưu token'); route(); }));
-    $('#gTest').addEventListener('click', (e) => act(e.target, async () => { const r = await api('/integrations/goship/test', { method: 'POST' }); toast(`Goship OK · ${r.cities} tỉnh/thành`); }));
+    $('#gTest').addEventListener('click', (e) => act(e.target, async () => { const r = await api('/integrations/goship/test', { method: 'POST' }); toast(`Goship OK · ${r.cities} tỉnh/thành · môi trường ${r.env === 'production' ? 'Thật' : 'Sandbox'}`); route(); }));
     $('#qTest').addEventListener('click', (e) => act(e.target, async () => {
       const r = await api('/shipping/quote', { method: 'POST', body: { items: [{ sku: 'BCX-350', qty: 2 }, { sku: 'COT-250', qty: 1 }], to: { province: 'Hà Nội', city: '100000' }, amount: 323000 } });
       $('#qRes').innerHTML = `<p>Kiện: ${num(r.parcel.weight)}g · ${r.parcel.length}×${r.parcel.width}×${r.parcel.height}cm${r.parcel.fragile ? ' · dễ vỡ' : ''}</p>` + r.options.map((x) => `<div>${esc(x.carrier)} ${esc(x.service || '')}: <b>${vnd(x.fee)}</b> ${esc(x.expected || '')}</div>`).join('');

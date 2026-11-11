@@ -55,26 +55,51 @@ export function fallbackQuote(parcel, province, cfg = {}) {
 export async function goshipConfig(env) {
   const cfg = (await getSetting(env, 'shipping', {})) || {};
   const token = await getSecret(env, 'goship_token', 'GOSHIP_TOKEN');
-  const base = (cfg.goship_env === 'production' ? 'https://api.goship.io/api/v2' : 'https://sandbox.goship.io/api/v2');
+  const base = cfg.goship_env === 'production' ? 'https://api.goship.io/api/v2' : 'https://sandbox.goship.io/api/v2';
   return { cfg, token, base, enabled: !!token };
 }
 
-async function gs(env, path, { method = 'GET', body } = {}) {
-  const { token, base } = await goshipConfig(env);
-  if (!token) throw new HttpError(503, 'Chưa kết nối Goship');
-  const r = await fetch(base + path, {
-    method,
-    headers: { accept: 'application/json', 'content-type': 'application/json', authorization: `Bearer ${token}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+const GOSHIP_BASE = { sandbox: 'https://sandbox.goship.io/api/v2', production: 'https://api.goship.io/api/v2' };
+
+async function gsRaw(base, token, path, method, body) {
+  let r;
+  try {
+    r = await fetch(base + path, {
+      method,
+      headers: { accept: 'application/json', 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    throw new HttpError(502, `Không kết nối được Goship (${base.includes('sandbox') ? 'Sandbox' : 'Thật'}): ${e.message}`);
+  }
   let data = null;
   try { data = await r.json(); } catch { /* bỏ qua */ }
+  return { r, data };
+}
+
+async function gs(env, path, { method = 'GET', body } = {}) {
+  const { token, base, cfg } = await goshipConfig(env);
+  if (!token) throw new HttpError(503, 'Chưa kết nối Goship');
+  let { r, data } = await gsRaw(base, token, path, method, body);
+  // Token Goship chỉ dùng được ở môi trường đã cấp (Sandbox hoặc Thật). Bị từ chối xác thực thì thử
+  // môi trường còn lại; nếu được thì tự lưu lại môi trường đúng.
+  if (r.status === 401 || r.status === 403) {
+    const other = cfg.goship_env === 'production' ? 'sandbox' : 'production';
+    const alt = await gsRaw(GOSHIP_BASE[other], token, path, method, body);
+    if (alt.r.ok && alt.data?.status !== 'error') {
+      await setSetting(env, 'shipping', { ...cfg, goship_env: other });
+      ({ r, data } = alt);
+    }
+  }
   if (!r.ok || (data && data.status === 'error')) {
     const msg = data?.data?.errors ? Object.values(data.data.errors).flat().join('; ') : data?.message || data?.data?.error || `Goship lỗi HTTP ${r.status}`;
-    throw new HttpError(502, msg);
+    throw new HttpError(502, (r.status === 401 || r.status === 403) ? `Goship từ chối token (HTTP ${r.status}): ${msg}. Kiểm tra lại token hoặc đăng nhập lại.` : msg);
   }
   return data;
 }
+
+// Danh sách trả về có thể nằm ở data hoặc data.data tuỳ phiên bản API
+const listOf = (d) => (Array.isArray(d?.data) ? d.data : Array.isArray(d?.data?.data) ? d.data.data : Array.isArray(d) ? d : []);
 
 // Đăng nhập lấy access_token (token sống ~10 năm), lưu vào settings
 export async function goshipLogin(env, { username, password, client_id, client_secret, goship_env }) {
@@ -98,17 +123,29 @@ async function cached(env, key, days, loader) {
   return data;
 }
 
-export async function listCities(env) {
+// Khi Goship lỗi: trang thanh toán vẫn chọn được tỉnh (danh sách 34 tỉnh) và tính phí theo bảng dự phòng
+const STATIC_CITIES = () => PROVINCES_34.map((n) => ({ id: n, name: n }));
+export async function listCities(env, { strict = false } = {}) {
   const { enabled } = await goshipConfig(env);
-  if (!enabled) return { source: 'static', items: PROVINCES_34.map((n) => ({ id: n, name: n })) };
-  const items = await cached(env, 'cities', 30, async () => (await gs(env, '/cities')).data.map((c) => ({ id: String(c.id), name: c.name })));
-  return { source: 'goship', items };
+  if (!enabled) return { source: 'static', items: STATIC_CITIES() };
+  try {
+    const items = await cached(env, 'cities', 30, async () => {
+      const list = listOf(await gs(env, '/cities')).map((c) => ({ id: String(c.id), name: c.name }));
+      if (!list.length) throw new HttpError(502, 'Goship trả về danh sách tỉnh trống');
+      return list;
+    });
+    return { source: 'goship', items };
+  } catch (e) {
+    console.error('goship cities', e.message);
+    if (strict) throw e;
+    return { source: 'static', items: STATIC_CITIES(), error: e.message };
+  }
 }
 export async function listDistricts(env, city) {
-  return cached(env, 'd:' + city, 30, async () => (await gs(env, `/cities/${encodeURIComponent(city)}/districts`)).data.map((d) => ({ id: String(d.id), name: d.name })));
+  return cached(env, 'd:' + city, 30, async () => listOf(await gs(env, `/cities/${encodeURIComponent(city)}/districts`)).map((d) => ({ id: String(d.id), name: d.name })));
 }
 export async function listWards(env, district) {
-  return cached(env, 'w:' + district, 30, async () => (await gs(env, `/districts/${encodeURIComponent(district)}/wards`)).data.map((w) => ({ id: String(w.id), name: w.name })));
+  return cached(env, 'w:' + district, 30, async () => listOf(await gs(env, `/districts/${encodeURIComponent(district)}/wards`)).map((w) => ({ id: String(w.id), name: w.name })));
 }
 
 export function normalizeRate(r, fragileFee = 0) {
@@ -137,7 +174,7 @@ export async function quoteShipping(env, parcel, to, { cod = 0, amount = 0 } = {
         parcel: { cod: Math.round(cod), amount: Math.round(amount), weight: parcel.weight, width: parcel.width, height: parcel.height, length: parcel.length },
       } },
     });
-    const list = (d.data || []).map((r) => normalizeRate(r, fragileFee)).filter((r) => r.id && r.fee > 0);
+    const list = listOf(d).map((r) => normalizeRate(r, fragileFee)).filter((r) => r.id && r.fee > 0);
     if (!list.length) return fallbackQuote(parcel, to?.province, cfg);
     list.sort((a, b) => a.fee - b.fee);
     return list.slice(0, 6);
