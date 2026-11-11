@@ -6,6 +6,9 @@ import { loadCatalog, priceCart, loadProducts, decorate, activeFlash, parseProdu
 import { checkout, syncPayment, markPaid, setOrderStatus, ensureCommissions, upsertCustomer, refreshCustomerStats, recomputeTier,
   STATUS_LABEL, PAY_LABEL, CHANNEL_LABEL, cronTick, logOrderEvent, orderTimeline } from '../lib/orders.js';
 import { estimateEta, fmtDay } from '../lib/eta.js';
+import { parseChangelog } from '../lib/changelog.js';
+import BUILD from '../generated/build-info.json';
+import CHANGELOG from '../../CHANGELOG.md?raw';
 import { walletSummary, LEVEL_NAMES, tierById } from '../lib/commission.js';
 import { listCities, listDistricts, listWards, quoteShipping, createShipment, verifyGoshipWebhook, goshipLogin, goshipConfig, GOSHIP_STATUS, buildParcel } from '../lib/shipping.js';
 import { testConnection, thuchiConfig } from '../lib/payment.js';
@@ -103,6 +106,8 @@ async function publicApi(request, env, url, p, m, ctx) {
       created_at: o.created_at, expire_minutes: s.payment?.expire_minutes || 1440, items,
     });
   }
+
+  if (p === '/api/version' && m === 'GET') return json({ version: BUILD.version, build: BUILD.build, commit: BUILD.commit, built_at: BUILD.built_at }, 200, { 'cache-control': 'no-store' });
 
   if (p === '/api/geo/cities' && m === 'GET') {
     const c = await listCities(env);
@@ -691,6 +696,11 @@ async function adminApi(request, env, url, p, m) {
   if (p === '/seo-audit' && m === 'GET') return json(await seoAudit(env, url));
 
   // ---- cài đặt, tích hợp
+  if (p === '/system/version' && m === 'GET') {
+    const d1 = await all(env, 'SELECT name, applied_at FROM d1_migrations ORDER BY id DESC LIMIT 1').catch(() => []);
+    return json({ ...BUILD, migration: d1[0] || null, changelog: parseChangelog(CHANGELOG).slice(0, 30),
+      links: { commit: BUILD.commit_full ? `https://github.com/${BUILD.repo}/commit/${BUILD.commit_full}` : null, releases: `https://github.com/${BUILD.repo}/releases`, actions: `https://github.com/${BUILD.repo}/actions` } });
+  }
   if (p === '/settings' && m === 'GET') {
     const s = await getSettings(env);
     const secrets = {};

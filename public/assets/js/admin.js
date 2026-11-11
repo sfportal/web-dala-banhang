@@ -789,6 +789,7 @@
         <details style="margin-top:10px" id="otpLogBox"><summary class="muted small">Nhật ký gửi OTP gần đây</summary><div id="otpLog" class="small" style="margin-top:8px"></div></details>
       </div>
       <div class="card" id="sSeo"><h2>SEO & đo lường</h2>${form([{ k: 'title', l: 'Tiêu đề trang chủ' }, { k: 'description', l: 'Mô tả trang chủ', t: 'textarea', rows: 2 }, { k: 'keywords', l: 'Từ khoá' }, { k: 'og_image', l: 'Ảnh chia sẻ (OG)', s: 3 }, { k: 'ga4', l: 'GA4 Measurement ID (G-XXXX)', s: 3 }, { k: 'gsc_verify', l: 'Mã xác minh Search Console', s: 2 }, { k: 'fb_pixel', l: 'Meta Pixel ID', s: 2 }, { k: 'tiktok_pixel', l: 'TikTok Pixel ID', s: 2 }, { k: 'head_extra', l: 'Mã chèn thêm vào <head>', t: 'textarea', rows: 2 }], seo)}</div>
+      <div class="card" id="sVer"><h2>Phiên bản & cập nhật</h2><p class="muted">Đang tải…</p></div>
       ${isAdmin ? '<div class="actions" style="position:sticky;bottom:10px"><button class="btn sun" id="saveS">💾 Lưu tất cả cài đặt</button></div>' : '<p class="muted">Chỉ quản trị viên được sửa cài đặt.</p>'}
       <div class="card" style="margin-top:16px" id="users"><h2>Người dùng quản trị</h2><div id="ulist"></div></div>`;
 
@@ -817,6 +818,17 @@
     }));
     const loyHint = () => { const f = readForm($('#sLoy')); const pct = f.earn_per ? (f.point_value / f.earn_per) * 100 : 0; $('#loyHint').textContent = `Tương đương hoàn ${pct.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}% giá trị đơn cho khách.`; };
     $('#sLoy').addEventListener('input', loyHint); loyHint();
+    api('/system/version').then((v) => {
+      const box = $('#sVer'); if (!box) return;
+      box.innerHTML = `<h2>Phiên bản & cập nhật <span class="badge b-green">v${esc(v.version)}</span></h2>
+        <dl class="kv"><dt>Bản đang chạy</dt><dd><b>v${esc(v.version)}</b>${v.build ? ` · bản dựng #${v.build}` : ''}${v.env === 'local' ? ' · <span class="badge b-sun">máy thử</span>' : ''}</dd>
+          <dt>Deploy lúc</dt><dd>${dt(v.built_at)}</dd>
+          ${v.commit ? `<dt>Mã nguồn</dt><dd>${v.links.commit ? `<a href="${esc(v.links.commit)}" target="_blank" rel="noopener">${esc(v.commit)}</a>` : esc(v.commit)}${v.commit_message ? ' · ' + esc(v.commit_message) : ''}</dd>` : ''}
+          ${v.migration ? `<dt>Cơ sở dữ liệu</dt><dd>${esc(v.migration.name)}</dd>` : ''}</dl>
+        <div class="actions"><a class="btn ghost sm" href="${esc(v.links.releases)}" target="_blank" rel="noopener">Các bản phát hành ↗</a><a class="btn ghost sm" href="${esc(v.links.actions)}" target="_blank" rel="noopener">Lịch sử deploy ↗</a></div>
+        <h3 style="margin-top:14px">Nhật ký cập nhật</h3>
+        <div class="vlog">${v.changelog.map((c, i) => `<details${i === 0 ? ' open' : ''}><summary><b>v${esc(c.version)}</b>${c.date ? ` <span class="muted small">${esc(c.date)}</span>` : ''}${c.version === v.version ? ' <span class="badge b-green">đang chạy</span>' : ''}</summary><ul>${c.items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></details>`).join('')}</div>`;
+    }).catch(() => { const b = $('#sVer'); if (b) b.innerHTML = '<h2>Phiên bản & cập nhật</h2><p class="muted">Không tải được thông tin phiên bản.</p>'; });
     $('#otpTest').addEventListener('click', (e) => act(e.target, async () => {
       await saveAll(true);
       const ka = $('#kEsmsA').value.trim(), ks = $('#kEsmsS').value.trim();

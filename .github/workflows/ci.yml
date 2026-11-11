@@ -15,6 +15,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Kiểm tra nhật ký cập nhật có mục cho phiên bản trong package.json
+        run: node scripts/release-notes.mjs > /dev/null
       - name: Kiểm thử hoa hồng 3 tầng, ví, phí giao hàng
         run: npm test
       - name: Build Astro (Cloudflare Workers)

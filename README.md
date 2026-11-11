@@ -100,6 +100,13 @@ Giới hạn chống spam: 60 giây giữa hai lần gửi, 5 mã/giờ mỗi s�
 
 Vào **Cài đặt → SEO & đo lường** để nhập GA4, Meta Pixel, TikTok Pixel và mã xác minh Google Search Console.
 
+### Phiên bản và nhật ký cập nhật
+- Phiên bản nằm ở `version` trong `package.json`, nhật ký ở `CHANGELOG.md`. Tính năng mới tăng số giữa, sửa lỗi tăng số cuối.
+- Mỗi PR tăng phiên bản phải thêm mục `## x.y.z – ngày` vào `CHANGELOG.md` (CI kiểm tra).
+- Khi gộp vào `main`, workflow Deploy tự tạo bản phát hành `vx.y.z` trên GitHub nếu chưa có. Mỗi lần deploy có số bản dựng riêng.
+- Admin → Cài đặt → Phiên bản & cập nhật hiện bản đang chạy, commit, migration mới nhất và nhật ký. `GET /api/version` trả phiên bản cho công cụ giám sát.
+- Quay lại bản trước: Cloudflare Dashboard → Workers → dala-shop → Deployments → Rollback. Thao tác này chỉ đổi mã nguồn, không hoàn tác migration cơ sở dữ liệu.
+
 ## Quy tắc nghiệp vụ chính
 
 - **Doanh số tính hoa hồng**: tiền hàng sau khi trừ giảm giá theo tỷ lệ, không tính phí ship. Món nào tắt "Tính hoa hồng" sẽ bị loại.
