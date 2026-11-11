@@ -5,7 +5,7 @@ import { getSetting } from './db.js';
 const envLabel = (e) => (e === 'production' ? 'production' : e ? 'sandbox' : null);
 async function attempt(fn) {
   const t = Date.now();
-  try { return { ok: true, data: await fn(), ms: Date.now() - t }; } catch (e) { return { ok: false, error: e.message, code: e.status || null, ms: Date.now() - t }; }
+  try { return { ok: true, data: await fn(), ms: Date.now() - t }; } catch (e) { return { ok: false, error: e.status === 404 ? `${e.message} (Thu-Chi đang chạy chưa có API này, cần deploy bản Thu-Chi mới)` : e.message, code: e.status || null, ms: Date.now() - t }; }
 }
 
 export async function integrationStatus(env) {
@@ -22,7 +22,7 @@ export async function integrationStatus(env) {
   const ping = await attempt(() => thuchiCall(env, '/ping'));
   const perm = ping.ok ? ping.data.permissions || {} : null;
   out.thuchi = { ...out.thuchi, ok: ping.ok || ping.code === 404, latency_ms: ping.ms, key_name: ping.data?.api_key?.name || null,
-    permissions: perm, error: ping.ok || ping.code === 404 ? null : ping.error };
+    permissions: perm, ping_api: ping.ok, error: ping.ok || ping.code === 404 ? null : ping.error };
   if (!out.thuchi.ok) return { ...out, payment: { ok: false, error: ping.error }, goship: { ok: false, error: ping.error }, otp: { ok: false, error: ping.error } };
 
   // Trạng thái chi tiết từ Thu-Chi (GET /status: môi trường và tình trạng từng tài khoản). Bản cũ chưa có thì bỏ qua.
