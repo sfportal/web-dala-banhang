@@ -1,16 +1,19 @@
-// Xác thực số điện thoại bằng OTP qua Zalo (ZNS) và SMS, nhà cung cấp eSMS.vn
+// Xác thực số điện thoại bằng OTP qua Zalo (ZNS) và SMS.
+// - provider 'thuchi' (mặc định): gửi và kiểm tra mã qua API web Thu-Chi (/api/v1/otp), website không giữ khoá eSMS
+// - provider 'esms': gọi thẳng eSMS.vn bằng khoá riêng (cách cũ); 'test': chỉ dùng trên máy phát triển
 // - Kênh "zalo_sms": gửi ZNS trước, nếu eSMS từ chối thì gửi SMS brandname cùng mã
 // - Mã 6 số, lưu dạng băm, hết hạn sau ttl_minutes, tối đa 5 lần nhập sai
 // - Giới hạn: 60 giây giữa hai lần gửi, 5 lần/giờ mỗi số, 15 lần/giờ mỗi IP
 import { all, first, run, getSetting, getSecret } from './db.js';
 import { HttpError, normPhone, validPhone } from './util.js';
+import { thuchiConfig, thuchiCall } from './payment.js';
 
 const ESMS = 'https://rest.esms.vn/MainService.svc/json';
 const MAX_ATTEMPTS = 5;
 export const OTP_PURPOSES = ['signup', 'affiliate', 'reset', 'test'];
 
 export const DEFAULT_AUTH = {
-  otp_signup: false, otp_affiliate: false, channel: 'zalo_sms', provider: 'esms', ttl_minutes: 5, policy_version: '2026-11',
+  otp_signup: false, otp_affiliate: false, channel: 'zalo_sms', provider: 'thuchi', thuchi_account_id: null, ttl_minutes: 5, policy_version: '2026-11',
   esms: { brandname: '', oa_id: '', zns_template_id: '', sms_template: '{otp} la ma xac thuc tai khoan DaLa cua ban. Ma co hieu luc {ttl} phut.', sandbox: false },
 };
 
@@ -24,7 +27,7 @@ export async function otpConfig(env) {
   const smsOk = !!e.brandname;
   const chan = auth.channel;
   const channelsReady = chan === 'zalo' ? zaloOk : chan === 'sms' ? smsOk : (zaloOk || smsOk);
-  const ready = auth.provider === 'test' || !!(apiKey && secretKey && channelsReady);
+  const ready = auth.provider === 'test' || (auth.provider === 'thuchi' ? (await thuchiConfig(env)).enabled : !!(apiKey && secretKey && channelsReady));
   return { auth, apiKey, secretKey, ready, zaloOk, smsOk };
 }
 
@@ -107,6 +110,18 @@ export async function sendOtp(env, { phone, purpose, ip, host, skipLimits = fals
     p, purpose, await hashCode(p, purpose, code, salt()), cfg.auth.provider, ip || null, `+${ttl} minutes`);
   const id = r.meta.last_row_id;
 
+  if (cfg.auth.provider === 'thuchi') {
+    try {
+      const d = await thuchiCall(env, '/otp/send', { method: 'POST', body: { phone: p, channel: cfg.auth.channel || undefined, purpose, account_id: Number(cfg.auth.thuchi_account_id) || undefined } });
+      if (d.status === 'failed') throw new HttpError(502, d.send_error || 'eSMS không nhận yêu cầu gửi');
+      await run(env, "UPDATE otp_codes SET status='sent', channel=?, ext_ref=? WHERE id=?", d.channel || cfg.auth.channel, d.request_id, id);
+      return { ok: true, channel: d.channel || cfg.auth.channel, ttl };
+    } catch (e) {
+      await run(env, "UPDATE otp_codes SET status='failed', error=? WHERE id=?", String(e.message).slice(0, 300), id);
+      if (e.status === 429) throw new HttpError(429, e.message);
+      throw new HttpError(502, purpose === 'test' ? `Gửi thất bại: ${e.message}` : 'Chưa gửi được mã xác thực, vui lòng thử lại sau ít phút');
+    }
+  }
   if (cfg.auth.provider === 'test') {
     await run(env, "UPDATE otp_codes SET status='sent', channel='test' WHERE id=?", id);
     return { ok: true, channel: 'test', ttl, dev_code: code };
@@ -131,6 +146,12 @@ export async function verifyOtp(env, { phone, purpose, code }) {
   const expired = await first(env, "SELECT 1 x WHERE ? < datetime('now')", row.expires_at);
   if (expired) { await run(env, "UPDATE otp_codes SET status='expired' WHERE id=?", row.id); throw new HttpError(400, 'Mã xác thực đã hết hạn, vui lòng gửi lại mã'); }
   if (row.attempts >= MAX_ATTEMPTS) throw new HttpError(429, 'Nhập sai quá nhiều lần, vui lòng gửi lại mã');
+  if (row.provider === 'thuchi') {
+    const d = await thuchiCall(env, '/otp/verify', { method: 'POST', body: { request_id: row.ext_ref, code: c } });
+    if (d.verified) { await run(env, "UPDATE otp_codes SET status='verified', verified_at=datetime('now') WHERE id=?", row.id); return true; }
+    await run(env, 'UPDATE otp_codes SET attempts=attempts+1, status=? WHERE id=?', ['expired', 'locked'].includes(d.status) ? 'expired' : 'sent', row.id);
+    throw new HttpError(400, d.status === 'expired' ? 'Mã xác thực đã hết hạn, vui lòng gửi lại mã' : d.status === 'locked' ? 'Nhập sai quá nhiều lần, vui lòng gửi lại mã' : d.message || 'Mã xác thực chưa đúng');
+  }
   const [s] = row.code_hash.split('$');
   if ((await hashCode(p, purpose, c, s)) !== row.code_hash) {
     await run(env, 'UPDATE otp_codes SET attempts=attempts+1 WHERE id=?', row.id);
@@ -139,6 +160,10 @@ export async function verifyOtp(env, { phone, purpose, code }) {
   }
   await run(env, "UPDATE otp_codes SET status='verified', verified_at=datetime('now') WHERE id=?", row.id);
   return true;
+}
+
+export async function listOtpAccounts(env) {
+  return thuchiCall(env, '/otp/accounts');
 }
 
 export const _test = { genCode, hashCode };

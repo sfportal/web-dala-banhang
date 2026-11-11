@@ -298,7 +298,9 @@ export async function cronTick(env) {
   const r = await run(env, `UPDATE commissions SET status='available' WHERE status='pending' AND available_at IS NOT NULL AND available_at <= datetime('now')
     AND order_id IN (SELECT id FROM orders WHERE status='completed')`);
   out.released = r.meta.changes || 0;
-  // 4. dọn phiên hết hạn, giữ sự kiện analytics 400 ngày
+  // 4. đồng bộ trạng thái vận đơn qua web Thu-Chi (không có webhook về website)
+  try { const { syncShipments } = await import('./shiptrack.js'); out.shipments = await syncShipments(env); } catch (e) { console.error('syncShipments', e.message); }
+  // 5. dọn phiên hết hạn, giữ sự kiện analytics 400 ngày
   await run(env, "DELETE FROM sessions WHERE expires_at < datetime('now')");
   await run(env, "DELETE FROM events WHERE ts < datetime('now','-400 days')");
   return out;

@@ -11,6 +11,12 @@ export async function thuchiConfig(env) {
   return { base, key, enabled: !!(base && key), pay };
 }
 
+// Gọi API v1 của web Thu-Chi (dùng chung cho thanh toán, vận chuyển Goship và OTP)
+export async function thuchiCall(env, path, opts = {}) {
+  if (opts.body && typeof opts.body !== 'string') opts = { ...opts, body: JSON.stringify(opts.body) };
+  return call(env, path, opts);
+}
+
 async function call(env, path, opts = {}) {
   const { base, key } = await thuchiConfig(env);
   if (!base || !key) throw new HttpError(503, 'Chưa kết nối web thu chi SePay');
@@ -23,7 +29,13 @@ async function call(env, path, opts = {}) {
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', accept: 'application/json' },
   });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.status !== 'success') throw new HttpError(r.status === 401 || r.status === 403 ? 502 : 502, d.message || `Web thu chi lỗi HTTP ${r.status}`);
+  if (!r.ok || d.status !== 'success') {
+    const msg = d.message || `Web thu chi lỗi HTTP ${r.status}`;
+    // 401/403: key sai hoặc thiếu quyền → báo rõ cho quản trị; 422/429 giữ nguyên để hiển thị
+    const code = r.status === 401 ? 502 : r.status === 403 ? 403 : [409, 422, 429].includes(r.status) ? r.status : 502;
+    throw new HttpError(code, r.status === 403 ? `API key Thu-Chi chưa có quyền này: ${msg}` : msg);
+  }
+  if (opts.withMeta) return { data: d.data, meta: d.meta };
   return d.data;
 }
 

@@ -3,6 +3,12 @@
 Mỗi lần gộp vào `main`, website tự deploy. Khi tăng `version` trong `package.json` và thêm mục tương ứng ở đây, lần deploy đó tự tạo bản phát hành `v<phiên bản>` trên GitHub.
 Quy ước: tính năng mới tăng số giữa (1.4.0 → 1.5.0), sửa lỗi tăng số cuối (1.5.0 → 1.5.1).
 
+## 1.6.0 – 11/11/2026
+- Goship và OTP Zalo/SMS gọi qua hệ thống Thu-Chi (dùng chung API key với thanh toán), website không còn giữ token Goship hay khoá eSMS.
+- Trạng thái vận đơn tự đồng bộ từ Thu-Chi mỗi 5 phút và khi khách mở trang đơn.
+- Địa chỉ lấy hàng có thể để trống để dùng địa chỉ mặc định của tài khoản Goship bên Thu-Chi.
+- Vẫn chọn lại được kết nối trực tiếp (token Goship, khoá eSMS) trong Admin → Cài đặt.
+
 ## 1.5.0 – 11/11/2026
 - Quản lý phiên bản: số phiên bản và bản dựng hiện trong Admin → Cài đặt, kèm nhật ký cập nhật.
 - Mỗi lần deploy có phiên bản mới thì tự tạo bản phát hành trên GitHub.

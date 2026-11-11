@@ -100,6 +100,12 @@ Giới hạn chống spam: 60 giây giữa hai lần gửi, 5 mã/giờ mỗi s�
 
 Vào **Cài đặt → SEO & đo lường** để nhập GA4, Meta Pixel, TikTok Pixel và mã xác minh Google Search Console.
 
+### Goship và OTP qua hệ thống Thu-Chi
+- Mặc định website gọi Goship (`/api/v1/goship/*`) và OTP (`/api/v1/otp/*`) qua web Thu-Chi, dùng chung địa chỉ và API key ở mục Thanh toán. API key cần thêm quyền **Goship** và **Xác minh SĐT** trong Thu-Chi → API & tích hợp.
+- Tài khoản Goship và eSMS cấu hình bên Thu-Chi; Admin → Cài đặt chọn tài khoản muốn dùng (bỏ trống là tài khoản đầu tiên).
+- Thu-Chi không gọi webhook về website: cron 5 phút lấy vận đơn thay đổi (`updated_since`), trang đơn của khách hỏi lại nếu quá 10 phút chưa cập nhật.
+- Kết nối trực tiếp (token Goship, khoá eSMS) vẫn chọn được trong admin.
+
 ### Phiên bản và nhật ký cập nhật
 - Phiên bản nằm ở `version` trong `package.json`, nhật ký ở `CHANGELOG.md`. Tính năng mới tăng số giữa, sửa lỗi tăng số cuối.
 - Mỗi PR tăng phiên bản phải thêm mục `## x.y.z – ngày` vào `CHANGELOG.md` (CI kiểm tra).

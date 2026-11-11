@@ -295,7 +295,7 @@
       $('#mkShip', d).addEventListener('click', (ev) => act(ev.target, async () => {
         const rate = $('input[name=rate]:checked', d)?.value;
         const r = await api(`/orders/${id}/shipment`, { method: 'POST', body: { rate_id: rate } });
-        toast('Đã tạo vận đơn ' + (r.shipment?.tracking_number || r.shipment?.id || '')); refresh();
+        toast('Đã tạo vận đơn ' + (r.shipment?.tracking_number || r.shipment?.gcode || '')); refresh();
       }));
     }));
     $('#saveO', d).addEventListener('click', (e) => act(e.target, async () => {
@@ -753,18 +753,22 @@
         </div>
       </div>
       <div class="card" id="sShip"><h2>Giao hàng ${s.status.goship ? '<span class="badge b-green">Goship đã kết nối</span>' : '<span class="badge b-sun">Goship chưa kết nối, đang dùng bảng phí dự phòng</span>'}</h2>
+        <div class="form" id="sShipVia"><div class="f s3"><label>Kết nối Goship</label><select name="provider" id="fShipProv"><option value="thuchi" ${ship.provider !== 'direct' ? 'selected' : ''}>Qua hệ thống Thu-Chi (khuyên dùng)</option><option value="direct" ${ship.provider === 'direct' ? 'selected' : ''}>Trực tiếp bằng token Goship</option></select></div>
+          <div class="f s3"><label>Tài khoản Goship bên Thu-Chi</label><select name="thuchi_account_id" id="fGsAcc"><option value="${esc(ship.thuchi_account_id || '')}">${ship.thuchi_account_id ? 'Tài khoản #' + esc(ship.thuchi_account_id) : 'Mặc định'}</option></select></div>
+          <p class="muted small" style="grid-column:1/-1;margin:0">Qua Thu-Chi: dùng chung API key ở mục Thanh toán (key cần quyền Goship). Không cần token Goship, trạng thái vận đơn tự đồng bộ 5 phút một lần và khi khách mở trang đơn.</p></div>
         ${form([{ k: 'free_threshold', l: 'Miễn phí ship từ (đ)', t: 'number', s: 2 }, { k: 'fragile_fee', l: 'Phụ phí hàng dễ vỡ (đ)', t: 'number', s: 2 }, { k: 'packaging_weight', l: 'Khối lượng bao bì (g)', t: 'number', s: 1 }, { k: 'fragile_padding_cm', l: 'Đệm chống sốc (cm)', t: 'number', s: 1 },
-          { k: 'pick', l: 'Hãng mặc định cho khách', t: 'select', s: 3, o: [['cheapest', 'Rẻ nhất'], ['fastest', 'Nhanh nhất'], ['best', 'Tỷ lệ giao thành công cao nhất']] }, { k: 'goship_env', l: 'Môi trường Goship', t: 'select', s: 3, o: [['sandbox', 'Sandbox (thử)'], ['production', 'Thật']] }], ship)}
+          { k: 'pick', l: 'Hãng mặc định cho khách', t: 'select', s: 3, o: [['cheapest', 'Rẻ nhất'], ['fastest', 'Nhanh nhất'], ['best', 'Tỷ lệ giao thành công cao nhất']] }, { k: 'goship_env', l: 'Môi trường Goship (khi kết nối trực tiếp)', t: 'select', s: 3, o: [['sandbox', 'Sandbox (thử)'], ['production', 'Thật']] }], ship)}
         <h3 style="margin-top:14px">Ngày giao dự kiến</h3>
         <p class="muted small">Khách thấy ngày giao dự kiến ở bước thanh toán và trang đơn = ngày gửi hàng + thời gian giao của hãng (Goship trả về, hoặc ${esc((ship.eta?.fallback_days || [2, 4]).join('–'))} ngày khi dùng bảng phí dự phòng).</p>
         ${form([{ k: 'cutoff_hour', l: 'Đơn đặt trước (giờ) gửi trong ngày', t: 'number', s: 2, get: (v) => v.cutoff_hour ?? 15 }, { k: 'prep_days', l: 'Thời gian chuẩn bị thêm (ngày)', t: 'number', s: 2, get: (v) => v.prep_days ?? 0 }, { k: 'pickup_sunday', l: 'Gửi hàng cả Chủ nhật', t: 'check', s: 2 }], ship.eta || {}).replace('class="form"', 'class="form" id="sEta"')}
         <h3 style="margin-top:14px">Địa chỉ lấy hàng</h3>
+        <p class="muted small">Khi kết nối qua Thu-Chi có thể để trống: hệ thống dùng địa chỉ lấy hàng mặc định của tài khoản Goship bên Thu-Chi.</p>
         <div class="form" id="sOrigin"><div class="f s2"><label>Tên người gửi</label><input name="name" value="${esc(ship.origin?.name || '')}" /></div><div class="f s2"><label>SĐT</label><input name="phone" value="${esc(ship.origin?.phone || '')}" /></div><div class="f s2"><label>Số nhà, đường</label><input name="street" value="${esc(ship.origin?.street || '')}" /></div>
           <div class="f s2"><label>Tỉnh/TP</label><select name="city" id="oCity"><option value="">${s.status.goship ? 'Đang tải…' : 'Cần kết nối Goship'}</option></select></div><div class="f s2"><label>Quận/Huyện</label><select name="district" id="oDist"></select></div><div class="f s2"><label>Phường/Xã</label><select name="ward" id="oWard"></select></div></div>
-        <h3 style="margin-top:14px">Kết nối Goship</h3>
+        <details style="margin-top:14px"${ship.provider === 'direct' ? ' open' : ''}><summary><b>Kết nối Goship trực tiếp</b> <span class="muted small">(chỉ dùng khi chọn "Trực tiếp bằng token Goship")</span></summary>
         <p class="muted small">Đăng nhập bằng tài khoản Goship và client_id / client_secret (lấy trong Goship → Cài đặt → API). Token được lưu mã hoá phía máy chủ. Webhook cập nhật trạng thái vận đơn: <code>${esc(s.webhook_url)}</code></p>
         <div class="form" id="gLogin"><div class="f s3"><label>Email/SĐT Goship</label><input name="username" autocomplete="off" /></div><div class="f s3"><label>Mật khẩu</label><input name="password" type="password" autocomplete="new-password" /></div><div class="f s2"><label>client_id</label><input name="client_id" /></div><div class="f s3"><label>client_secret ${s.secrets.goship_client_secret ? '(đã lưu)' : ''}</label><input name="client_secret" type="password" autocomplete="off" /></div><div class="f s1" style="align-self:end"><button class="btn ghost sm" id="gDo">Kết nối</button></div></div>
-        <details style="margin-top:8px"><summary class="muted small">Hoặc dán access token Goship có sẵn</summary><div class="form" style="margin-top:8px"><div class="f s4"><input id="gTok" type="password" placeholder="access_token" /></div><div class="f s2"><button class="btn ghost sm" id="gTokSave">Lưu token</button></div></div></details>
+        <details style="margin-top:8px"><summary class="muted small">Hoặc dán access token Goship có sẵn</summary><div class="form" style="margin-top:8px"><div class="f s4"><input id="gTok" type="password" placeholder="access_token" /></div><div class="f s2"><button class="btn ghost sm" id="gTokSave">Lưu token</button></div></div></details></details>
         <div class="actions"><button class="btn ghost sm" id="gTest">Kiểm tra kết nối Goship</button><button class="btn ghost sm" id="qTest">Thử tính phí: 2 bột chuối + 1 cốt về Hà Nội</button></div><div id="qRes" class="small"></div>
       </div>
       <div class="card" id="sAff"><h2>Cộng tác viên & hoa hồng</h2>
@@ -778,14 +782,16 @@
         <p class="muted small" id="loyHint"></p>
       </div>
       <div class="card" id="sAuth"><h2>Tài khoản & xác thực SĐT ${s.status.otp ? '<span class="badge b-green">Gửi OTP sẵn sàng</span>' : '<span class="badge b-sun">Chưa cấu hình gửi OTP</span>'}</h2>
-        <p class="muted small">Khách đặt hàng không cần đăng nhập. Khi bật, khách tạo tài khoản và/hoặc đăng ký CTV phải nhập mã OTP gửi qua Zalo (ZNS) hoặc SMS. Nhà cung cấp: <a href="https://esms.vn" target="_blank" rel="noopener">eSMS.vn</a> (một tài khoản gửi được cả Zalo ZNS và SMS brandname). Công tắc chỉ có hiệu lực khi đã cấu hình gửi OTP. Khi chưa bật OTP, khách chưa xác thực chỉ xem được tóm tắt đơn cũ (ẩn địa chỉ).</p>
+        <p class="muted small">Khách đặt hàng không cần đăng nhập. Khi bật, khách tạo tài khoản và/hoặc đăng ký CTV phải nhập mã OTP gửi qua Zalo (ZNS) hoặc SMS. Mặc định gửi qua hệ thống Thu-Chi (dùng chung API key ở mục Thanh toán, key cần quyền Xác minh SĐT), website không giữ khoá eSMS. Công tắc chỉ có hiệu lực khi đã cấu hình gửi OTP. Khi chưa bật OTP, khách chưa xác thực chỉ xem được tóm tắt đơn cũ (ẩn địa chỉ).</p>
+        <div class="form" id="sOtpVia"><div class="f s3"><label>Nhà cung cấp OTP</label><select name="provider"><option value="thuchi" ${auth.provider !== 'esms' ? 'selected' : ''}>Qua hệ thống Thu-Chi (khuyên dùng)</option><option value="esms" ${auth.provider === 'esms' ? 'selected' : ''}>eSMS trực tiếp bằng khoá riêng</option></select></div>
+          <div class="f s3"><label>Tài khoản eSMS bên Thu-Chi</label><select name="thuchi_account_id" id="fOtpAcc"><option value="${esc(auth.thuchi_account_id || '')}">${auth.thuchi_account_id ? 'Tài khoản #' + esc(auth.thuchi_account_id) : 'Mặc định'}</option></select></div></div>
         <div id="sAuthMain">${form([{ k: 'otp_signup', l: 'Bắt buộc OTP khi tạo tài khoản khách', t: 'check', s: 3 }, { k: 'otp_affiliate', l: 'Bắt buộc OTP khi đăng ký CTV', t: 'check', s: 3 },
           { k: 'channel', l: 'Kênh gửi', t: 'select', s: 2, o: [['zalo_sms', 'Zalo trước, lỗi thì SMS'], ['zalo', 'Chỉ Zalo ZNS'], ['sms', 'Chỉ SMS']] }, { k: 'ttl_minutes', l: 'Mã hết hạn sau (phút)', t: 'number', s: 2 }, { k: 'policy_version', l: 'Phiên bản chính sách CTV', s: 2, h: 'Đổi khi sửa chính sách để ghi nhận CTV đồng ý bản nào' }], auth)}</div>
-        <h3 style="margin-top:14px">eSMS</h3>
+        <details style="margin-top:14px"${auth.provider === 'esms' ? ' open' : ''}><summary><b>eSMS trực tiếp</b> <span class="muted small">(chỉ dùng khi chọn "eSMS trực tiếp")</span></summary>
         <div id="sEsms">${form([{ k: 'brandname', l: 'Brandname SMS', s: 2, get: (v) => v.esms?.brandname, h: 'Tên thương hiệu đã đăng ký với eSMS' }, { k: 'oa_id', l: 'Zalo OA ID', s: 2, get: (v) => v.esms?.oa_id }, { k: 'zns_template_id', l: 'Mã mẫu ZNS OTP', s: 2, get: (v) => v.esms?.zns_template_id, h: 'Mẫu ZNS có 1 tham số là mã OTP' },
           { k: 'sms_template', l: 'Nội dung SMS (không dấu, {otp} và {ttl} sẽ được thay)', s: 6, get: (v) => v.esms?.sms_template, h: 'Phải khớp mẫu đã đăng ký với nhà mạng' }, { k: 'sandbox', l: 'Chế độ Sandbox (eSMS nhận lệnh nhưng không gửi thật)', t: 'check', s: 6, get: (v) => v.esms?.sandbox }], auth)}</div>
-        <div class="form" style="margin-top:8px"><div class="f s2"><label>ApiKey ${s.secrets.esms_api_key ? `(đang dùng ${esc(s.secrets.esms_api_key)})` : ''}</label><input id="kEsmsA" type="password" autocomplete="off" placeholder="Dán ApiKey" /></div><div class="f s2"><label>SecretKey ${s.secrets.esms_secret_key ? `(đang dùng ${esc(s.secrets.esms_secret_key)})` : ''}</label><input id="kEsmsS" type="password" autocomplete="off" placeholder="Dán SecretKey" /></div>
-          <div class="f s1"><label>SĐT nhận thử</label><input id="otpPhone" inputmode="tel" placeholder="09…" /></div><div class="f s1" style="align-self:end"><button class="btn ghost sm" id="otpTest">Lưu & gửi thử</button></div></div>
+        <div class="form" style="margin-top:8px"><div class="f s2"><label>ApiKey ${s.secrets.esms_api_key ? `(đang dùng ${esc(s.secrets.esms_api_key)})` : ''}</label><input id="kEsmsA" type="password" autocomplete="off" placeholder="Dán ApiKey" /></div><div class="f s2"><label>SecretKey ${s.secrets.esms_secret_key ? `(đang dùng ${esc(s.secrets.esms_secret_key)})` : ''}</label><input id="kEsmsS" type="password" autocomplete="off" placeholder="Dán SecretKey" /></div></div></details>
+        <div class="form" style="margin-top:8px"><div class="f s2"><label>SĐT nhận thử</label><input id="otpPhone" inputmode="tel" placeholder="09…" /></div><div class="f s1" style="align-self:end"><button class="btn ghost sm" id="otpTest">Lưu & gửi thử</button></div></div>
         <details style="margin-top:10px" id="otpLogBox"><summary class="muted small">Nhật ký gửi OTP gần đây</summary><div id="otpLog" class="small" style="margin-top:8px"></div></details>
       </div>
       <div class="card" id="sSeo"><h2>SEO & đo lường</h2>${form([{ k: 'title', l: 'Tiêu đề trang chủ' }, { k: 'description', l: 'Mô tả trang chủ', t: 'textarea', rows: 2 }, { k: 'keywords', l: 'Từ khoá' }, { k: 'og_image', l: 'Ảnh chia sẻ (OG)', s: 3 }, { k: 'ga4', l: 'GA4 Measurement ID (G-XXXX)', s: 3 }, { k: 'gsc_verify', l: 'Mã xác minh Search Console', s: 2 }, { k: 'fb_pixel', l: 'Meta Pixel ID', s: 2 }, { k: 'tiktok_pixel', l: 'TikTok Pixel ID', s: 2 }, { k: 'head_extra', l: 'Mã chèn thêm vào <head>', t: 'textarea', rows: 2 }], seo)}</div>
@@ -818,6 +824,13 @@
     }));
     const loyHint = () => { const f = readForm($('#sLoy')); const pct = f.earn_per ? (f.point_value / f.earn_per) * 100 : 0; $('#loyHint').textContent = `Tương đương hoàn ${pct.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}% giá trị đơn cho khách.`; };
     $('#sLoy').addEventListener('input', loyHint); loyHint();
+    api('/integrations/thuchi/accounts').then((r) => {
+      const fillAcc = (sel, list, cur, label) => { if (!sel) return; sel.innerHTML = '<option value="">Mặc định (tài khoản đầu tiên)</option>' + (list || []).map((a) => `<option value="${a.id}" ${String(a.id) === String(cur || '') ? 'selected' : ''}>${esc(a.name)}${label(a)}</option>`).join(''); };
+      fillAcc($('#fGsAcc'), r.goship, ship.thuchi_account_id, (a) => ` · ${a.env === 'production' ? 'Thật' : 'Sandbox'}${a.sender?.name ? ' · gửi từ ' + esc(a.sender.name) : ''}`);
+      fillAcc($('#fOtpAcc'), r.otp, auth.thuchi_account_id, (a) => ` · ${(a.channels || []).join(', ') || 'chưa có kênh'}${a.sandbox ? ' · sandbox' : ''}`);
+      if (r.goship_error && $('#fGsAcc')) $('#fGsAcc').insertAdjacentHTML('afterend', `<span class="muted small">${esc(r.goship_error)}</span>`);
+      if (r.otp_error && $('#fOtpAcc')) $('#fOtpAcc').insertAdjacentHTML('afterend', `<span class="muted small">${esc(r.otp_error)}</span>`);
+    }).catch(() => {});
     api('/system/version').then((v) => {
       const box = $('#sVer'); if (!box) return;
       box.innerHTML = `<h2>Phiên bản & cập nhật <span class="badge b-green">v${esc(v.version)}</span></h2>
@@ -850,7 +863,7 @@
     $('#otpLogBox').addEventListener('toggle', (e) => { if (e.target.open) loadOtpLog(); });
     $('#gDo').addEventListener('click', (e) => act(e.target, async () => { await api('/integrations/goship/login', { method: 'POST', body: { ...readForm($('#gLogin')), goship_env: $('#sShip [name=goship_env]').value } }); await saveAll(true); toast('Đã kết nối Goship'); route(); }));
     $('#gTokSave').addEventListener('click', (e) => act(e.target, async () => { await api('/settings/secret', { method: 'POST', body: { key: 'goship_token', value: $('#gTok').value.trim() } }); toast('Đã lưu token'); route(); }));
-    $('#gTest').addEventListener('click', (e) => act(e.target, async () => { const r = await api('/integrations/goship/test', { method: 'POST' }); toast(`Goship OK · ${r.cities} tỉnh/thành · môi trường ${r.env === 'production' ? 'Thật' : 'Sandbox'}`); route(); }));
+    $('#gTest').addEventListener('click', (e) => act(e.target, async () => { const r = await api('/integrations/goship/test', { method: 'POST' }); toast(r.provider === 'thuchi' ? `Goship qua Thu-Chi OK · ${r.cities} tỉnh/thành` : `Goship OK · ${r.cities} tỉnh/thành · môi trường ${r.env === 'production' ? 'Thật' : 'Sandbox'}`); route(); }));
     $('#qTest').addEventListener('click', (e) => act(e.target, async () => {
       const r = await api('/shipping/quote', { method: 'POST', body: { items: [{ sku: 'BCX-350', qty: 2 }, { sku: 'COT-250', qty: 1 }], to: { province: 'Hà Nội', city: '100000' }, amount: 323000 } });
       $('#qRes').innerHTML = `<p>Kiện: ${num(r.parcel.weight)}g · ${r.parcel.length}×${r.parcel.width}×${r.parcel.height}cm${r.parcel.fragile ? ' · dễ vỡ' : ''}</p>` + r.options.map((x) => `<div>${esc(x.carrier)} ${esc(x.service || '')}: <b>${vnd(x.fee)}</b> ${esc(x.expected || '')}</div>`).join('');
@@ -862,11 +875,11 @@
       const body = {
         shop: { ...shop, ...readForm($('#sShop')) },
         payment: { ...pay, ...readForm($('#sPay > .form')), bank },
-        shipping: { ...ship, ...readForm($('#sShip > .form')), eta: { ...(ship.eta || {}), ...readForm($('#sEta')) }, origin: { ...readForm($('#sOrigin')), city_name: $('#oCity').selectedOptions[0]?.text || '', district_name: $('#oDist').selectedOptions[0]?.text || '', ward_name: $('#oWard').selectedOptions[0]?.text || '' } },
+        shipping: { ...ship, ...readForm($('#sShip > .form:not(#sShipVia)')), ...readForm($('#sShipVia')), eta: { ...(ship.eta || {}), ...readForm($('#sEta')) }, origin: { ...readForm($('#sOrigin')), city_name: $('#oCity').selectedOptions[0]?.text || '', district_name: $('#oDist').selectedOptions[0]?.text || '', ward_name: $('#oWard').selectedOptions[0]?.text || '' } },
         affiliate: { ...aff, ...readForm($('#sAff .form')), tiers },
         seo: { ...seo, ...readForm($('#sSeo')) },
         loyalty: { ...loy, ...readForm($('#sLoy')) },
-        auth: (() => { const a = { ...auth, ...readForm($('#sAuthMain')) }; a.ttl_minutes = Number(a.ttl_minutes) || 5; a.esms = { ...(auth.esms || {}), ...readForm($('#sEsms')) }; return a; })(),
+        auth: (() => { const a = { ...auth, ...readForm($('#sAuthMain')), ...readForm($('#sOtpVia')) }; a.ttl_minutes = Number(a.ttl_minutes) || 5; a.esms = { ...(auth.esms || {}), ...readForm($('#sEsms')) }; return a; })(),
       };
       await api('/settings', { method: 'PUT', body });
       if (!quiet) toast('Đã lưu cài đặt');

@@ -10,12 +10,13 @@ import { parseChangelog } from '../lib/changelog.js';
 import BUILD from '../generated/build-info.json';
 import CHANGELOG from '../../CHANGELOG.md?raw';
 import { walletSummary, LEVEL_NAMES, tierById } from '../lib/commission.js';
-import { listCities, listDistricts, listWards, quoteShipping, createShipment, verifyGoshipWebhook, goshipLogin, goshipConfig, GOSHIP_STATUS, buildParcel } from '../lib/shipping.js';
+import { listCities, listDistricts, listWards, quoteShipping, createShipment, verifyGoshipWebhook, goshipLogin, goshipConfig, GOSHIP_STATUS, buildParcel, listGoshipAccounts } from '../lib/shipping.js';
 import { testConnection, thuchiConfig } from '../lib/payment.js';
 import { createSession, getSession, endSession } from '../lib/session.js';
 import { accountApi, linkedAffiliate } from './account.js';
-import { sendOtp, otpConfig } from '../lib/otp.js';
+import { sendOtp, otpConfig, listOtpAccounts } from '../lib/otp.js';
 import { adjustPoints } from '../lib/loyalty.js';
+import { applyShipmentUpdate, refreshOrderShipment } from '../lib/shiptrack.js';
 
 
 // Khoá ký link đơn hàng: ưu tiên secret APP_SECRET, nếu không có thì tự sinh một lần và lưu trong D1
@@ -93,7 +94,7 @@ async function publicApi(request, env, url, p, m, ctx) {
     if (url.searchParams.get('t') !== (await orderToken(env, code))) throw new HttpError(403, 'Liên kết đơn hàng không hợp lệ');
     let o = await first(env, 'SELECT * FROM orders WHERE code=?', code);
     if (!o) throw new HttpError(404, 'Không tìm thấy đơn hàng');
-    if (url.searchParams.get('check') === '1') o = await syncPayment(env, o);
+    if (url.searchParams.get('check') === '1') { o = await syncPayment(env, o); o = await refreshOrderShipment(env, o); }
     const items = await all(env, 'SELECT i.sku, i.name, i.price, i.qty, p.image, p.slug FROM order_items i LEFT JOIN products p ON p.id=i.product_id WHERE order_id=?', o.id);
     const s = await getSettings(env);
     return json({
@@ -209,21 +210,13 @@ async function goshipWebhook(request, env, url) {
   const d = parseJson(raw, {});
   const o = await first(env, 'SELECT * FROM orders WHERE code=? OR goship_id=?', d.order_id || '', d.gcode || '');
   if (!o) return json({ ok: true, ignored: true });
-  const st = Number(d.status);
-  await run(env, `UPDATE orders SET ship_status=?, ship_status_text=?, tracking_code=COALESCE(?, tracking_code), tracking_url=COALESCE(?, tracking_url),
-    goship_id=COALESCE(goship_id, ?), shipping_cost=COALESCE(?, shipping_cost), updated_at=datetime('now') WHERE id=?`,
-  String(st), d.status_text || GOSHIP_STATUS[st] || null, d.code || null, d.tracking_url || null, d.gcode || null, Number(d.fee) || null, o.id);
-  // Ghi lịch sử giao nhận thực tế từ hãng (bỏ mốc đối soát nội bộ 909–912)
-  if (![909, 910, 911, 912].includes(st)) {
-    const where = d.location || d.current_location || d.address || d.hub || null;
-    const note = d.message || d.note || d.reason || d.status_desc || d.description || null;
-    const at = d.updated_at || d.time || d.created_at || null;
-    await logOrderEvent(env, o.id, { kind: 'ship', code: st, title: d.status_text || GOSHIP_STATUS[st] || 'Cập nhật vận chuyển', detail: note, location: where, source: 'goship',
-      at: at && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(at) ? toSqlUtc(at) : null });
-  }
-  if ([902, 903, 904, 919].includes(st) && ['new', 'confirmed'].includes(o.status)) await setOrderStatus(env, o, 'shipping', 'Goship');
-  else if ([905, 913].includes(st) && o.status !== 'completed') await setOrderStatus(env, o, 'completed', 'Goship');
-  else if (st === 908 && o.status !== 'returned') await setOrderStatus(env, o, 'returned', 'Goship');
+  const at = d.updated_at || d.time || d.created_at || null;
+  await applyShipmentUpdate(env, o, {
+    gcode: d.gcode, tracking_number: d.code, status: d.status, status_text: d.status_text, tracking_url: d.tracking_url, fee: d.fee,
+    status_desc: d.message || d.note || d.reason || d.status_desc || d.description || null,
+    location: d.location || d.current_location || d.address || d.hub || null,
+    at: at && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(at) ? toSqlUtc(at) : null,
+  });
   return json({ ok: true });
 }
 
@@ -430,10 +423,10 @@ async function adminApi(request, env, url, p, m) {
     if (!o.district_code) throw new HttpError(400, 'Đơn thiếu mã quận/huyện Goship, không tạo vận đơn tự động được');
     if (!b.rate_id || b.rate_id === 'fallback') throw new HttpError(400, 'Chọn một hãng vận chuyển từ Goship');
     const d = await createShipment(env, o, b.rate_id);
-    await run(env, `UPDATE orders SET goship_id=?, tracking_code=?, shipping_carrier=?, shipping_cost=?, ship_status=?, ship_status_text=?, updated_at=datetime('now') WHERE id=?`,
-      d.id || null, d.tracking_number || null, d.carrier || o.shipping_carrier, Number(d.fee) || null, String(d.shipment_status || ''), d.shipment_status_txt || null, o.id);
+    await run(env, `UPDATE orders SET goship_id=?, tracking_code=?, shipping_carrier=?, shipping_cost=?, ship_status=?, ship_status_text=?, tracking_url=COALESCE(?, tracking_url), updated_at=datetime('now') WHERE id=?`,
+      d.gcode || null, d.tracking_number || null, d.carrier || o.shipping_carrier, d.fee, d.status == null ? null : String(d.status), d.status_text || null, d.tracking_url, o.id);
     await logOrderEvent(env, o.id, { kind: 'ship', code: 'created', title: `Đã tạo vận đơn ${d.carrier || o.shipping_carrier || ''}`.trim(),
-      detail: d.tracking_number ? 'Mã vận đơn ' + d.tracking_number : null, source: 'admin' });
+      detail: d.tracking_number ? 'Mã vận đơn ' + d.tracking_number : d.gcode ? 'Mã Goship ' + d.gcode : null, source: 'admin' });
     let o2 = await first(env, 'SELECT * FROM orders WHERE id=?', o.id);
     if (['new', 'confirmed'].includes(o2.status)) o2 = await setOrderStatus(env, o2, 'shipping', user.username);
     return json({ ok: true, shipment: d, order: o2 });
@@ -737,10 +730,19 @@ async function adminApi(request, env, url, p, m) {
   }
   if (p === '/integrations/goship/login' && m === 'POST') { need('admin'); await goshipLogin(env, await readBody(request)); return json({ ok: true }); }
   if (p === '/integrations/goship/test' && m === 'POST') {
-    if (!(await goshipConfig(env)).enabled) throw new HttpError(400, 'Chưa có token Goship');
+    const gc = await goshipConfig(env);
+    if (!gc.enabled) throw new HttpError(400, gc.provider === 'thuchi' ? 'Chưa kết nối hệ thống Thu-Chi (nhập địa chỉ và API key ở mục Thanh toán)' : 'Chưa có token Goship');
     await run(env, "DELETE FROM geo_cache WHERE key='cities'");
     const fresh = await listCities(env, { strict: true });
-    return json({ ok: true, cities: fresh.items.length, env: (await goshipConfig(env)).cfg.goship_env || 'sandbox' });
+    const after = await goshipConfig(env);
+    return json({ ok: true, cities: fresh.items.length, provider: after.provider, env: after.cfg.goship_env || 'sandbox' });
+  }
+  if (p === '/integrations/thuchi/accounts' && m === 'GET') {
+    const out = {};
+    if (!(await thuchiConfig(env)).enabled) return json({ goship: [], otp: [], goship_error: 'Chưa kết nối Thu-Chi', otp_error: 'Chưa kết nối Thu-Chi' });
+    try { out.goship = await listGoshipAccounts(env); } catch (e) { out.goship = []; out.goship_error = e.message; }
+    try { out.otp = await listOtpAccounts(env); } catch (e) { out.otp = []; out.otp_error = e.message; }
+    return json(out);
   }
   if (p === '/shipping/quote' && m === 'POST') {
     const b = await readBody(request);
