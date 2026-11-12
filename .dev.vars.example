@@ -2,7 +2,7 @@
 ADMIN_PASSWORD=doi-mat-khau-nay
 APP_SECRET=chuoi-ngau-nhien-dai-it-nhat-32-ky-tu
 # Không bắt buộc: có thể nhập trong trang Quản trị → Cài đặt thay vì đặt ở đây
-# THUCHI_BASE_URL=https://sepay-thuchi.minhducuy.workers.dev
+# THUCHI_BASE_URL=https://sepay-thuchi.sfportal.workers.dev
 # THUCHI_API_KEY=tc_xxx
 # GOSHIP_TOKEN=xxx
 # GOSHIP_CLIENT_SECRET=xxx

@@ -3,6 +3,9 @@
 Mỗi lần gộp vào `main`, website tự deploy. Khi tăng `version` trong `package.json` và thêm mục tương ứng ở đây, lần deploy đó tự tạo bản phát hành `v<phiên bản>` trên GitHub.
 Quy ước: tính năng mới tăng số giữa (1.4.0 → 1.5.0), sửa lỗi tăng số cuối (1.5.0 → 1.5.1).
 
+## 1.8.1 – 12/11/2026
+- Địa chỉ Thu-Chi đã lưu tự chuyển sang tên miền mới sfportal.workers.dev.
+
 ## 1.8.0 – 12/11/2026
 - Tài liệu hệ thống tại /tai-lieu: mô tả đầy đủ tính năng website, cộng tác viên và trang quản trị, cần mật mã để xem.
 - Bản Markdown cho chatbot và hệ thống khác tại /tai-lieu.md (gửi mật mã qua ?key=, header X-Docs-Key hoặc Authorization: Bearer).

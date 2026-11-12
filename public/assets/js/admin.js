@@ -745,7 +745,7 @@
     el.innerHTML = `
       <div class="card" id="sThuchi"><h2>Kết nối hệ thống Thu-Chi <span id="intBadge" class="badge b-gray">đang kiểm tra…</span></h2>
         <p class="muted small">Thanh toán SePay, vận chuyển Goship và mã OTP Zalo/SMS (eSMS) đều đi qua hệ thống Thu-Chi bằng một API key. Website không kết nối trực tiếp và không giữ token Goship hay khoá eSMS. Tạo key ở Thu-Chi → Tích hợp → API key cho đối tác, tích quyền <b>Tạo yêu cầu thu</b>, <b>Goship</b> và <b>Xác minh SĐT</b>.</p>
-        <div class="form" id="sThuchiForm"><div class="f s3"><label>Địa chỉ hệ thống Thu-Chi</label><input name="thuchi_base" value="${esc(pay.thuchi_base || '')}" placeholder="https://sepay-thuchi.minhducuy.workers.dev" /></div>
+        <div class="form" id="sThuchiForm"><div class="f s3"><label>Địa chỉ hệ thống Thu-Chi</label><input name="thuchi_base" value="${esc(pay.thuchi_base || '')}" placeholder="https://sepay-thuchi.sfportal.workers.dev" /></div>
           <div class="f s2"><label>API key ${s.secrets.thuchi_api_key ? `(đang dùng ${esc(s.secrets.thuchi_api_key)})` : ''}</label><input id="kThuchi" type="password" placeholder="Dán API key mới" autocomplete="off" /></div>
           <div class="f s1" style="align-self:end"><button class="btn sm" id="testThuchi">Lưu & kiểm tra</button></div></div>
         <div id="intStatus" class="int-grid" style="margin-top:12px"><p class="muted">Đang kiểm tra trạng thái tích hợp…</p></div>
