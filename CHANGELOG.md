@@ -7,6 +7,7 @@ Quy ước: tính năng mới tăng số giữa (1.4.0 → 1.5.0), sửa lỗi t
 - Tài liệu hệ thống tại /tai-lieu: mô tả đầy đủ tính năng website, cộng tác viên và trang quản trị, cần mật mã để xem.
 - Bản Markdown cho chatbot và hệ thống khác tại /tai-lieu.md (gửi mật mã qua ?key=, header X-Docs-Key hoặc Authorization: Bearer).
 - Đổi mật mã xem tài liệu trong Admin → Cài đặt → Tài liệu hệ thống.
+- Địa chỉ Thu-Chi đã lưu tự chuyển sang tên miền mới sfportal.workers.dev.
 
 ## 1.7.1 – 11/11/2026
 - Sửa kiểm tra trạng thái tích hợp báo "Endpoint không tồn tại" cho cả 4 dịch vụ khi Thu-Chi đang chạy bản cũ chưa có /ping: giờ vẫn kiểm tra SePay, Goship, OTP qua các API sẵn có và nhắc deploy lại Thu-Chi.
