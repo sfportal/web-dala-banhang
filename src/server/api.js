@@ -691,6 +691,13 @@ async function adminApi(request, env, url, p, m) {
     else await run(env, 'DELETE FROM settings WHERE key=?', 'secret:' + b.key);
     return json({ ok: true });
   }
+  if (p === '/docs/password' && m === 'POST') {
+    need('admin');
+    const pw = String((await readBody(request)).password || '').trim();
+    if (pw.length < 6) throw new HttpError(400, 'Mật mã tối thiểu 6 ký tự');
+    await setSetting(env, 'secret:docs_pass_hash', await hashPassword(pw));
+    return json({ ok: true });
+  }
   if (p === '/integrations/thuchi/test' && m === 'POST') return json(await testConnection(env));
   if (p === '/integrations/otp/test' && m === 'POST') {
     need('admin');

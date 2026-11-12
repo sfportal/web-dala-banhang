@@ -790,6 +790,8 @@
         <details style="margin-top:10px" id="otpLogBox"><summary class="muted small">Nhật ký gửi OTP gần đây</summary><div id="otpLog" class="small" style="margin-top:8px"></div></details>
       </div>
       <div class="card" id="sSeo"><h2>SEO & đo lường</h2>${form([{ k: 'title', l: 'Tiêu đề trang chủ' }, { k: 'description', l: 'Mô tả trang chủ', t: 'textarea', rows: 2 }, { k: 'keywords', l: 'Từ khoá' }, { k: 'og_image', l: 'Ảnh chia sẻ (OG)', s: 3 }, { k: 'ga4', l: 'GA4 Measurement ID (G-XXXX)', s: 3 }, { k: 'gsc_verify', l: 'Mã xác minh Search Console', s: 2 }, { k: 'fb_pixel', l: 'Meta Pixel ID', s: 2 }, { k: 'tiktok_pixel', l: 'TikTok Pixel ID', s: 2 }, { k: 'head_extra', l: 'Mã chèn thêm vào <head>', t: 'textarea', rows: 2 }], seo)}</div>
+      <div class="card" id="sDocs"><h2>Tài liệu hệ thống</h2><p class="muted">Mô tả đầy đủ tính năng website và trang quản trị cho người mới, chatbot hoặc hệ thống khác. Xem tại <a href="/tai-lieu" target="_blank">/tai-lieu</a> (cần mật mã); máy đọc dùng <code>/tai-lieu.md?key=&lt;mật mã&gt;</code> hoặc header <code>X-Docs-Key</code>.</p>
+        <div class="row" style="gap:8px;align-items:end"><label style="flex:1">Đổi mật mã xem tài liệu<input type="password" id="docsPw" placeholder="Mật mã mới (tối thiểu 6 ký tự)" autocomplete="new-password"></label><button class="btn" id="docsPwSave" type="button">Đổi mật mã</button></div></div>
       <div class="card" id="sVer"><h2>Phiên bản & cập nhật</h2><p class="muted">Đang tải…</p></div>
       ${isAdmin ? '<div class="actions" style="position:sticky;bottom:10px"><button class="btn sun" id="saveS">💾 Lưu tất cả cài đặt</button></div>' : '<p class="muted">Chỉ quản trị viên được sửa cài đặt.</p>'}
       <div class="card" style="margin-top:16px" id="users"><h2>Người dùng quản trị</h2><div id="ulist"></div></div>`;
@@ -872,6 +874,7 @@
         { h: 'Trạng thái', f: (r) => `${esc(S[r.status] || r.status)}${r.error ? `<div class="muted small">${esc(r.error)}</div>` : ''}` }, { h: 'Nhập sai', num: 1, k: 'attempts' }], rows.slice(0, 50));
     };
     $('#otpLogBox').addEventListener('toggle', (e) => { if (e.target.open) loadOtpLog(); });
+    $('#docsPwSave')?.addEventListener('click', (e) => act(e.target, async () => { await api('/docs/password', { method: 'POST', body: { password: $('#docsPw').value } }); $('#docsPw').value = ''; toast('Đã đổi mật mã tài liệu'); }));
     $('#gTest').addEventListener('click', (e) => act(e.target, async () => { await loadStatus(); $('#sThuchi').scrollIntoView({ behavior: 'smooth' }); }));
     $('#qTest').addEventListener('click', (e) => act(e.target, async () => {
       const r = await api('/shipping/quote', { method: 'POST', body: { items: [{ sku: 'BCX-350', qty: 2 }, { sku: 'COT-250', qty: 1 }], to: { province: 'Hà Nội', city: '100000' }, amount: 323000 } });
