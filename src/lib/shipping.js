@@ -1,5 +1,5 @@
 // Phí giao hàng: Goship API v2 (tra cước mọi hãng trên tuyến) + bảng phí dự phòng khi chưa kết nối
-// Tất cả gọi qua web Thu-Chi: https://sepay-thuchi.minhducuy.workers.dev/docs#goship
+// Tất cả gọi qua web Thu-Chi: https://sepay-thuchi.sfportal.workers.dev/docs#goship
 import { all, first, run, getSetting } from './db.js';
 import { HttpError } from './util.js';
 import { thuchiConfig, thuchiCall } from './payment.js';
