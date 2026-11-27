@@ -168,6 +168,19 @@ async function publicApi(request, env, url, p, m, ctx) {
     return json({ ok: true });
   }
 
+  // Webhook Zalo Mini App: sự kiện người dùng rút lại đồng ý hoặc yêu cầu xoá dữ liệu.
+  // Mini app không lưu mã Zalo trên máy chủ, nên chỉ ghi phiếu hỗ trợ để DaLa xử lý theo /dieu-khoan-zalo.
+  if (p === '/api/zalo/webhook' && (m === 'GET' || m === 'HEAD')) return json({ error: 0, message: 'ok' });
+  if (p === '/api/zalo/webhook' && m === 'POST') {
+    const raw = (await request.text().catch(() => '')).slice(0, 4000);
+    let ev = {};
+    try { ev = JSON.parse(raw) || {}; } catch {}
+    const kind = String(ev.event_name || ev.event || ev.type || 'không rõ').slice(0, 80);
+    await run(env, 'INSERT INTO tickets (name, topic, message, channel, priority) VALUES (?,?,?,?,?)',
+      'Zalo Mini App', 'khac', `Sự kiện Zalo Mini App (${kind}): người dùng rút lại đồng ý hoặc yêu cầu xoá dữ liệu.\n${raw.slice(0, 1800)}`, 'zalo', 'high');
+    return json({ error: 0, message: 'ok' });
+  }
+
   if (p === '/api/cron' && m === 'POST') {
     if (!env.CRON_KEY || request.headers.get('x-cron-key') !== env.CRON_KEY) throw new HttpError(403, 'forbidden');
     return json(await cronTick(env));

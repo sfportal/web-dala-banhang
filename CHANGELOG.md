@@ -3,6 +3,10 @@
 Mỗi lần gộp vào `main`, website tự deploy. Khi tăng `version` trong `package.json` và thêm mục tương ứng ở đây, lần deploy đó tự tạo bản phát hành `v<phiên bản>` trên GitHub.
 Quy ước: tính năng mới tăng số giữa (1.4.0 → 1.5.0), sửa lỗi tăng số cuối (1.5.0 → 1.5.1).
 
+## 1.9.1 – 27/11/2026
+- Trang Điều khoản sử dụng Zalo Mini App tại /dieu-khoan-zalo: quyền mini app xin, dữ liệu thu thập, cách rút lại đồng ý và xoá dữ liệu.
+- Webhook /api/zalo/webhook nhận sự kiện người dùng rút lại đồng ý hoặc xoá dữ liệu từ Zalo, ghi thành phiếu hỗ trợ ưu tiên cao trong Admin.
+
 ## 1.9.0 – 27/11/2026
 - Zalo Mini App cho cửa hàng DaLa trong thư mục `zalo-miniapp/`: xem sản phẩm, giỏ hàng, thanh toán COD/VietQR, theo dõi đơn, dùng chung dữ liệu với website.
 - API cửa hàng công khai (catalog, báo giá, đặt hàng, xem đơn, địa chỉ) cho phép gọi từ mini app của Zalo; API quản trị, tài khoản, CTV không đổi.
