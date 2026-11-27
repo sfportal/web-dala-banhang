@@ -6,11 +6,16 @@ import CartPage from '../pages/cart';
 import CheckoutPage from '../pages/checkout';
 import OrderPage from '../pages/order';
 import OrdersPage from '../pages/orders';
+import FlashPage from '../pages/flash';
+import AccountPage from '../pages/account';
+import { Welcome } from './welcome';
 
 const TABS = [
   { key: '/', label: 'Cửa hàng', icon: '🏡' },
+  { key: '/flash-sale', label: 'Flash Sale', icon: '⚡' },
   { key: '/gio-hang', label: 'Giỏ hàng', icon: '🧺' },
   { key: '/don-hang', label: 'Đơn hàng', icon: '📦' },
+  { key: '/tai-khoan', label: 'Tài khoản', icon: '👤' },
 ] as const;
 
 function Nav() {
@@ -40,6 +45,8 @@ export function Layout() {
           <ZMPRouter>
             <AnimationRoutes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/flash-sale" element={<FlashPage />} />
+              <Route path="/tai-khoan" element={<AccountPage />} />
               <Route path="/san-pham/:slug" element={<ProductPage />} />
               <Route path="/gio-hang" element={<CartPage />} />
               <Route path="/thanh-toan" element={<CheckoutPage />} />
@@ -47,6 +54,7 @@ export function Layout() {
               <Route path="/don-hang/:code" element={<OrderPage />} />
             </AnimationRoutes>
             <Nav />
+            <Welcome />
           </ZMPRouter>
         </StoreProvider>
       </SnackbarProvider>

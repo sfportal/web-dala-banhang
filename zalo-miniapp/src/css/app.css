@@ -15,10 +15,12 @@ ul { padding-left: 20px; margin: 0; line-height: 1.6; }
 .red { color: var(--red); font-size: 1.3rem; }
 .green { color: var(--green); }
 .center { text-align: center; }
-.big { font-size: 3rem; }
+.big { font-size: 3rem; line-height: 1.2; }
 
 .page { background: var(--cream); min-height: 100vh; padding-bottom: 16px; }
 .page.has-nav { padding-bottom: 80px; }
+/* Thanh tiêu đề của zmp-ui cố định ở trên (44px + vùng tai thỏ), đẩy nội dung xuống để không bị che */
+.page.has-header { padding-top: calc(var(--zaui-safe-area-inset-top, env(safe-area-inset-top, 0px)) + 44px); }
 .page.has-bar { padding-bottom: 96px; }
 .page.has-nav.has-bar { padding-bottom: 160px; }
 .title { font-size: 1.3rem; font-weight: 800; padding: calc(var(--zaui-safe-area-inset-top, env(safe-area-inset-top)) + 16px) 16px 8px; }
@@ -137,3 +139,44 @@ ul { padding-left: 20px; margin: 0; line-height: 1.6; }
 
 .nav-ico { position: relative; font-size: 1.2rem; }
 .badge { position: absolute; top: -6px; right: -12px; background: var(--red); color: #fff; font-size: .65rem; min-width: 16px; height: 16px; border-radius: 8px; padding: 0 4px; display: flex; align-items: center; justify-content: center; }
+
+/* Flash Sale */
+.flash-bar { cursor: pointer; }
+.flash-strip { display: flex; gap: 10px; overflow-x: auto; padding: 10px 16px 2px; scrollbar-width: none; }
+.flash-strip::-webkit-scrollbar { display: none; }
+.flash-strip .card { flex: none; width: 150px; }
+.flash-hero { margin: 0; padding: calc(var(--zaui-safe-area-inset-top, env(safe-area-inset-top, 0px)) + 18px) 16px 18px; background: linear-gradient(135deg, var(--red), var(--sun)); color: #fff; }
+.flash-hero h1 { font-size: 1.6rem; margin: 0 0 4px; }
+.flash-hero .cd { font-size: 1.1rem; }
+.meter { height: 8px; border-radius: 99px; background: #fde7e3; overflow: hidden; margin: 4px 0 2px; }
+.meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), var(--sun)); }
+.meter-t { font-size: .75rem; color: var(--red); font-weight: 700; }
+
+/* Màn hình chào: điều khoản và quyền */
+.welcome { position: fixed; inset: 0; z-index: 2000; background: var(--cream); overflow-y: auto; padding: calc(var(--zaui-safe-area-inset-top, env(safe-area-inset-top, 0px)) + 24px) 20px calc(24px + env(safe-area-inset-bottom)); }
+.welcome .logo { width: 72px; height: 72px; border-radius: 18px; background: #fff; padding: 8px; object-fit: contain; margin: 0 auto 8px; box-shadow: 0 2px 8px rgba(31,42,28,.1); }
+.welcome h1 { text-align: center; }
+.welcome .perm { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.welcome .perm:last-child { border-bottom: 0; }
+.welcome .perm i { font-style: normal; font-size: 1.4rem; width: 28px; text-align: center; }
+.welcome .perm small { display: block; color: var(--muted); }
+.agree { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0; font-size: .92rem; line-height: 1.45; }
+.agree input { width: 20px; height: 20px; accent-color: var(--green); flex: none; margin-top: 1px; }
+
+/* Tài khoản, cộng tác viên */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+.stat { background: var(--paper); border-radius: 12px; padding: 10px 12px; }
+.stat small { display: block; color: var(--muted); font-size: .78rem; }
+.stat b { font-size: 1.05rem; }
+.stat.hi { background: #eef6e8; }
+.stat.hi b { color: var(--green); }
+.code-box { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff7e3; border: 1.5px dashed var(--sun); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.code-box b { font-size: 1.25rem; letter-spacing: 1px; }
+.comm-row { display: flex; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.comm-row:last-child { border-bottom: 0; }
+.st { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: #eee; color: var(--muted); }
+.st.available, .st.paid { background: #eef6e8; color: var(--green); }
+.st.pending, .st.requested, .st.approved { background: #fff7e3; color: #a86b00; }
+.st.void, .st.rejected { background: #fde7e3; color: var(--red); }
+.field textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font-size: 1rem; font-family: inherit; }
+.loc-btn { display: inline-flex; align-items: center; gap: 4px; }

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Header, Page, useNavigate, useSnackbar } from 'zmp-ui';
-import { getUserInfo } from 'zmp-sdk/apis';
-import { api, Destination, GeoItem, groupLines, img, Quote, vnd } from '../api';
+import { api, Destination, GeoAddress, GeoItem, groupLines, img, Quote, vnd } from '../api';
 import { useStore } from '../store';
+import { useZaloProfile } from '../components/welcome';
+import { askPermissions, matchPlace } from '../zalo';
 import { Empty, Loading } from '../components/ui';
 
 type Pay = 'cod' | 'sepay';
@@ -20,7 +21,8 @@ function Sel({ label, value, items, ph, onChange, disabled }: { label: string; v
 }
 
 export default function CheckoutPage() {
-  const { cart, clear, customer, setCustomer, addOrder } = useStore();
+  const { cart, clear, customer, setCustomer, addOrder, located, ref } = useStore();
+  const { login, findMe } = useZaloProfile();
   const navigate = useNavigate();
   const { openSnackbar } = useSnackbar();
   const [f, setF] = useState({ name: customer.name || '', phone: customer.phone || '', address: customer.address || '', note: '' });
@@ -39,6 +41,10 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const first = useRef(true);
+  // Địa chỉ lấy từ vị trí hiện tại, khớp lần lượt tỉnh → quận → phường khi danh sách tải xong
+  const pending = useRef<GeoAddress | null>(null);
+  const autoLoc = useRef(false);
+  const [locating, setLocating] = useState(false);
 
   // Địa chỉ: dùng danh sách Goship khi website đã kết nối, nếu không chỉ chọn tỉnh và ghi phường/xã vào địa chỉ
   useEffect(() => {
@@ -52,15 +58,62 @@ export default function CheckoutPage() {
     api.districts(city).then((d) => {
       if (!d.items.length) { setGeoSource('static'); return; }
       setDistricts(d.items);
+      const a = pending.current;
+      if (a) {
+        const m = matchPlace(d.items, [a.district, ...a.names]);
+        if (m) setDistrict(m.id); else pending.current = null;
+      }
     });
     if (!first.current) { setDistrict(''); setWard(''); }
   }, [city, geoSource]);
   useEffect(() => {
     if (geoSource !== 'goship' || !district) { setWards([]); return; }
-    api.wards(district).then((d) => setWards(d.items));
+    api.wards(district).then((d) => {
+      setWards(d.items);
+      const a = pending.current;
+      if (a) { const m = matchPlace(d.items, [a.ward, ...a.names]); if (m) setWard(m.id); pending.current = null; }
+    });
     if (!first.current) setWard('');
     first.current = false;
   }, [district, geoSource]);
+
+  const applyLocation = (a: GeoAddress | null) => {
+    if (!a || !cities.length) return false;
+    const c = matchPlace(cities, [a.province, ...a.names]);
+    if (!c) { openSnackbar({ text: 'Chưa khớp được tỉnh/thành từ vị trí, vui lòng chọn tay', type: 'warning' }); return false; }
+    pending.current = geoSource === 'goship' ? a : null;
+    first.current = false;
+    if (c.id === city && geoSource === 'goship') { // cùng tỉnh: khớp lại quận ngay
+      const d = matchPlace(districts, [a.district, ...a.names]);
+      if (d) setDistrict(d.id);
+    }
+    setCity(c.id);
+    if (!f.address.trim()) {
+      const parts = geoSource === 'goship' ? [a.road] : [a.road, a.ward, a.district];
+      const addr = parts.filter(Boolean).join(', ');
+      if (addr) setF((x) => ({ ...x, address: x.address || addr }));
+    }
+    return true;
+  };
+  // Lần đầu mở trang: chưa có địa chỉ đã lưu thì dùng vị trí đã lấy ở màn hình chào
+  useEffect(() => {
+    if (autoLoc.current || !cities.length) return;
+    autoLoc.current = true;
+    if (!city && located) applyLocation({ display: null, ...located, province: located.province || null, district: located.district || null, ward: located.ward || null, road: located.road || null, names: located.names || [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cities]);
+  // Đăng nhập bằng SĐT Zalo xong thì điền vào ô còn trống
+  useEffect(() => {
+    setF((x) => ({ ...x, name: x.name || customer.name || '', phone: x.phone || customer.phone || '' }));
+  }, [customer.name, customer.phone]);
+
+  const useMyLocation = async () => {
+    setLocating(true);
+    const g = await askPermissions(['scope.userLocation']);
+    if (g['scope.userLocation']) { const a = await findMe(); if (a) applyLocation({ ...a }); }
+    else openSnackbar({ text: 'Bạn chưa cho phép lấy vị trí', type: 'warning' });
+    setLocating(false);
+  };
 
   const name = (list: GeoItem[], id: string) => list.find((i) => i.id === id)?.name || '';
   const to = (): Destination | null => {
@@ -78,19 +131,18 @@ export default function CheckoutPage() {
     if (!cart.length) return;
     let live = true;
     const t = setTimeout(() => {
-      api.quote({ items: cart, voucher, phone: f.phone, to: dest, payment_method: pay, rate_id: rateId })
+      api.quote({ items: cart, voucher, ref, phone: f.phone, to: dest, payment_method: pay, rate_id: rateId })
         .then((q) => { if (!live) return; setQuote(q); setRateId(q.shipping?.selected?.id || null); })
         .catch((e) => live && setErr(e.message));
     }, 250);
     return () => { live = false; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart, voucher, destKey, pay, rateId, f.phone]);
+  }, [cart, voucher, destKey, pay, rateId, f.phone, ref]);
 
   const fillFromZalo = async () => {
-    try {
-      const { userInfo } = await getUserInfo({ autoRequestPermission: true });
-      if (userInfo?.name) setF((x) => ({ ...x, name: x.name || userInfo.name }));
-    } catch { openSnackbar({ text: 'Chưa lấy được thông tin Zalo', type: 'warning' }); }
+    const g = await askPermissions(['scope.userInfo', 'scope.userPhonenumber']);
+    if (g['scope.userPhonenumber']) await login();
+    else openSnackbar({ text: 'Bạn chưa cho phép chia sẻ số điện thoại Zalo', type: 'warning' });
   };
 
   const submit = async () => {
@@ -100,7 +152,7 @@ export default function CheckoutPage() {
     setSubmitting(true); setErr(null);
     try {
       const d = await api.checkout({
-        ...f, to: dest, items: cart, voucher, payment_method: pay, rate_id: rateId,
+        ...f, to: dest, items: cart, voucher, ref, payment_method: pay, rate_id: rateId,
         channel: 'zalo', utm: { source: 'zalo', medium: 'miniapp' },
       });
       setCustomer({ name: f.name, phone: f.phone, address: f.address, city, district, ward });
@@ -113,17 +165,18 @@ export default function CheckoutPage() {
     } finally { setSubmitting(false); }
   };
 
-  if (!cart.length) return <Page className="page"><Header title="Thanh toán" /><Empty icon="🧺" text="Giỏ hàng trống" /></Page>;
+  if (!cart.length) return <Page className="page has-header"><Header title="Thanh toán" /><Empty icon="🧺" text="Giỏ hàng trống" /></Page>;
   const sh = quote?.shipping;
   const total = quote ? (dest ? quote.total : quote.subtotal - quote.discount) : 0;
 
   return (
-    <Page className="page has-bar">
+    <Page className="page has-header has-bar">
       <Header title="Thanh toán" />
       <div className="section">
-        <div className="row-between"><h2>Người nhận</h2><button className="link" onClick={fillFromZalo}>Dùng tên Zalo</button></div>
+        <div className="row-between"><h2>Người nhận</h2><button className="link" onClick={fillFromZalo}>Dùng thông tin Zalo</button></div>
         <label className="field"><span>Họ tên</span><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoComplete="name" /></label>
         <label className="field"><span>Số điện thoại</span><input value={f.phone} inputMode="tel" onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder="10 số, bắt đầu bằng 0" /></label>
+        <div className="row-between" style={{ marginBottom: 6 }}><span className="muted small">Địa chỉ nhận hàng</span><button className="link loc-btn" disabled={locating} onClick={useMyLocation}>{locating ? <><span className="spin" /> Đang lấy vị trí…</> : '📍 Dùng vị trí hiện tại'}</button></div>
         <Sel label="Tỉnh/thành" value={city} items={cities} ph="Chọn tỉnh/thành" onChange={setCity} />
         {geoSource === 'goship' && (
           <>

@@ -11,9 +11,10 @@ test('chỉ mở CORS cho tên miền Zalo Mini App và localhost', () => {
   assert.equal(corsOrigin(null), null);
 });
 
-test('chỉ API cửa hàng công khai được gọi từ mini app', () => {
-  for (const p of ['/api/catalog', '/api/cart/quote', '/api/checkout', '/api/orders/DL000123', '/api/geo/wards']) assert.ok(CORS_PATHS.test(p), p);
-  for (const p of ['/api/admin/orders', '/api/account/me', '/api/aff/me', '/api/cron', '/api/t']) assert.ok(!CORS_PATHS.test(p), p);
+test('mini app gọi được API cửa hàng, đăng nhập Zalo, tài khoản và CTV; quản trị thì không', () => {
+  for (const p of ['/api/catalog', '/api/cart/quote', '/api/checkout', '/api/orders/DL000123', '/api/geo/wards', '/api/zalo/login', '/api/zalo/location',
+    '/api/account/me', '/api/account/affiliate', '/api/aff/me', '/api/aff/orders', '/api/aff/withdraw']) assert.ok(CORS_PATHS.test(p), p);
+  for (const p of ['/api/admin/orders', '/api/admin/settings', '/api/account/login', '/api/account/register', '/api/aff/login', '/api/zalo/webhook', '/api/cron', '/api/t']) assert.ok(!CORS_PATHS.test(p), p);
 });
 
 test('gắn header CORS mà giữ nguyên nội dung và mã trạng thái', async () => {

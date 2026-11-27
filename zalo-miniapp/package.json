@@ -1,6 +1,6 @@
 {
   "name": "dala-zalo-miniapp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Zalo Mini App cửa hàng DaLa, dùng chung API và dữ liệu với website dala-shop",

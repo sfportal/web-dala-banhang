@@ -37,10 +37,14 @@ Biến môi trường (`.env`): `VITE_API_BASE` địa chỉ website, `VITE_OA_I
 
 ## Máy chủ
 
-Website mở CORS cho tên miền mini app của Zalo (`h5.zdn.vn`) và `localhost`, chỉ ở các API cửa hàng công khai: catalog, báo giá giỏ, đặt hàng, xem đơn (cần mã ký), địa chỉ, lô hàng, liên hệ. API quản trị, tài khoản và CTV vẫn chỉ dùng trên website. Xem `src/lib/cors.js`.
+Website mở CORS cho tên miền mini app của Zalo (`h5.zdn.vn`) và `localhost` ở các API: cửa hàng công khai (catalog, báo giá giỏ, đặt hàng, xem đơn cần mã ký, địa chỉ, lô hàng, liên hệ), `/api/zalo/login`, `/api/zalo/location`, một phần `/api/account/*` và `/api/aff/*`. Tài khoản và CTV trong mini app xác thực bằng header `Authorization: Bearer <token>` (token trả về từ `/api/zalo/login`), không dùng cookie. API quản trị không mở. Xem `src/lib/cors.js`.
+
+## Số điện thoại và vị trí Zalo
+
+- Mini app gọi `getPhoneNumber` / `getLocation` để lấy token, gửi kèm `getAccessToken` lên máy chủ. Máy chủ đổi token qua `graph.zalo.me/v2.0/me/info` bằng Secret Key của Zalo App (Admin → Cài đặt → Zalo Mini App, hoặc secret `ZALO_APP_SECRET`). Xem `src/server/zalo.js`.
+- Toạ độ được tra tên địa chỉ qua OpenStreetMap (Nominatim). Bản đồ dùng địa giới mới (tỉnh → phường), nên thường chỉ khớp chắc tỉnh/thành; quận/phường khớp được khi tên trùng danh sách Goship.
+- Trên trang quản lý mini app của Zalo cần xin quyền "Số điện thoại" và "Vị trí" thì các API trên mới trả token.
 
 ## Việc còn lại
 
-- Lấy số điện thoại khách bằng Zalo (`getPhoneNumber`): cần máy chủ đổi token lấy số qua Zalo Open API với Secret Key của mini app.
-- Đăng nhập tài khoản khách, điểm tích luỹ, cổng CTV: hiện chỉ có trên website.
 - Thanh toán: đang dùng VietQR (SePay) và COD như website. Nếu Zalo yêu cầu dùng cổng thanh toán của Zalo khi duyệt, chuyển sang Checkout SDK (`createOrder` trong `zmp-sdk`).

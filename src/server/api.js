@@ -19,6 +19,7 @@ import { sendOtp, otpConfig } from '../lib/otp.js';
 import { adjustPoints } from '../lib/loyalty.js';
 import { refreshOrderShipment } from '../lib/shiptrack.js';
 import { CORS_PATHS, corsOrigin, withCors } from '../lib/cors.js';
+import { zaloApi } from './zalo.js';
 
 
 // Khoá ký link đơn hàng: ưu tiên secret APP_SECRET, nếu không có thì tự sinh một lần và lưu trong D1
@@ -63,6 +64,7 @@ async function routeApi(request, env, ctx, url, p) {
   try {
     if (p.startsWith('/api/admin')) return await adminApi(request, env, url, p.slice('/api/admin'.length) || '/', m);
     if (p.startsWith('/api/account')) return await accountApi(request, env, url, p.slice('/api/account'.length) || '/', m);
+    if (p === '/api/zalo/login' || p === '/api/zalo/location') return await zaloApi(request, env, p, m);
     if (p.startsWith('/api/aff')) return await affApi(request, env, url, p.slice('/api/aff'.length) || '/', m);
     return await publicApi(request, env, url, p, m, ctx);
   } catch (e) {

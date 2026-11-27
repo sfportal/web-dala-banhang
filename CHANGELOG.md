@@ -3,6 +3,16 @@
 Mỗi lần gộp vào `main`, website tự deploy. Khi tăng `version` trong `package.json` và thêm mục tương ứng ở đây, lần deploy đó tự tạo bản phát hành `v<phiên bản>` trên GitHub.
 Quy ước: tính năng mới tăng số giữa (1.4.0 → 1.5.0), sửa lỗi tăng số cuối (1.5.0 → 1.5.1).
 
+## 1.10.0 – 27/11/2026
+- Zalo Mini App: màn hình chào lần đầu để khách đồng ý điều khoản, rồi xin quyền tên, số điện thoại và vị trí Zalo (khách có thể từ chối).
+- Đăng nhập tài khoản khách bằng số điện thoại Zalo, không cần mật khẩu hay OTP; tự điền họ tên, số điện thoại khi đặt hàng.
+- Nút "Dùng vị trí hiện tại" điền sẵn tỉnh/thành (và quận/phường khi khớp được) cùng địa chỉ giao hàng.
+- Mini app có trang Flash Sale (đếm ngược, số suất đã bán), dải Flash Sale ở trang chủ, và tab Tài khoản: điểm tích luỹ, đăng ký cộng tác viên, mã và link giới thiệu, ví hoa hồng, rút tiền.
+- Link giới thiệu cộng tác viên mở thẳng mini app (zalo.me/s/…/?ref=MÃ), đơn đặt trong mini app tính hoa hồng như website.
+- Admin → Cài đặt có mục Zalo Mini App để nhập Secret Key của Zalo App (bắt buộc cho đăng nhập bằng SĐT và lấy vị trí).
+- Sửa nội dung trang thanh toán, sản phẩm, chi tiết đơn trong mini app bị thanh tiêu đề che.
+- Cập nhật điều khoản /dieu-khoan-zalo cho quyền số điện thoại, vị trí và dữ liệu cộng tác viên.
+
 ## 1.9.1 – 27/11/2026
 - Trang Điều khoản sử dụng Zalo Mini App tại /dieu-khoan-zalo: quyền mini app xin, dữ liệu thu thập, cách rút lại đồng ý và xoá dữ liệu.
 - Webhook /api/zalo/webhook nhận sự kiện người dùng rút lại đồng ý hoặc xoá dữ liệu từ Zalo, ghi thành phiếu hỗ trợ ưu tiên cao trong Admin.

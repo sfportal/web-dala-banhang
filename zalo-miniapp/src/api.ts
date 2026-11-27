@@ -21,6 +21,25 @@ export type Quote = {
 };
 export type Destination = { city?: string; district?: string; ward?: string; province?: string; city_name?: string; district_name?: string; ward_name?: string };
 export type GeoItem = { id: string; name: string };
+export type GeoAddress = { province: string | null; district: string | null; ward: string | null; road: string | null; names: string[]; display: string | null };
+export type AccountMe = {
+  guest?: boolean;
+  customer?: { id: number; phone: string; name: string | null; email: string | null; address: string | null; province: string | null; phone_verified: boolean };
+  affiliate?: { id: number; code: string; status: string; name: string } | null;
+  stats?: { n: number; spent: number };
+  loyalty?: { enabled: boolean; points: number; value: number };
+};
+export type Tier = { id: string; name: string; min_sales: number; rates?: number[] };
+export type AffMe = {
+  me: { code: string; name: string; phone: string; status: string; tier: Tier; bank_name: string | null; bank_account: string | null; bank_holder: string | null };
+  next_tier: Tier | null; month: { sales: number; comm: number; orders: number };
+  by_level: { level: number; name: string; amount: number }[];
+  wallet: { pending: number; earned: number; requested: number; paid: number; balance: number };
+  withdrawals: { id: number; amount: number; status: string; created_at: string }[];
+  team: { f1: number; f2: number }; customers: number; clicks_30d: number;
+  policy: { hold_days: number; min_withdraw: number; payout_days: string; cookie_days: number; buyer_discount_pct: number };
+};
+export type AffOrder = { level: number; level_name: string; amount: number; base: number; cstatus: string; code: string; created_at: string; status: string; status_label: string; buyer: string };
 export type Order = {
   code: string; status: string; status_label: string; payment_status: string; payment_label: string; payment_method: 'cod' | 'sepay';
   total: number; subtotal: number; discount: number; shipping_fee: number; paid_amount: number | null;
@@ -32,11 +51,18 @@ export type Order = {
   items: { sku: string; name: string; price: number; qty: number; image: string | null }[];
 };
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(API_BASE + path, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+// Phiên đăng nhập khách (token từ /api/zalo/login), gửi bằng header Authorization
+let sessionToken = '';
+export const setSessionToken = (t: string) => { sessionToken = t || ''; };
+
+async function call<T>(path: string, body?: unknown, method?: string): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (sessionToken) headers.authorization = 'Bearer ' + sessionToken;
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  const r = await fetch(API_BASE + path, { method: method || (body === undefined ? 'GET' : 'POST'), headers, body: body === undefined ? undefined : JSON.stringify(body) });
   let d: any = null;
   try { d = await r.json(); } catch { /* máy chủ trả về không phải JSON */ }
-  if (!r.ok) throw new Error(d?.error || 'Không kết nối được DaLa, vui lòng thử lại');
+  if (!r.ok) throw Object.assign(new Error(d?.error || 'Không kết nối được DaLa, vui lòng thử lại'), { status: r.status });
   return d as T;
 }
 
@@ -47,6 +73,14 @@ export const api = {
   order: (code: string, token: string, check = false) => call<Order>(`/api/orders/${code}?t=${encodeURIComponent(token)}${check ? '&check=1' : ''}`),
   cities: () => call<{ source: string; items: GeoItem[] }>('/api/geo/cities').catch(() => ({ source: 'static', items: [] as GeoItem[] })),
   districts: (city: string) => call<{ items: GeoItem[] }>('/api/geo/districts?city=' + encodeURIComponent(city)).catch(() => ({ items: [] as GeoItem[] })),
+  zaloLogin: (b: { access_token: string; phone_token: string; name?: string }) => call<{ token: string; customer: { name: string | null; phone: string } }>('/api/zalo/login', b),
+  zaloLocation: (b: { access_token: string; location_token: string }) => call<{ lat: number; lng: number; address: GeoAddress | null }>('/api/zalo/location', b),
+  me: () => call<AccountMe>('/api/account/me'),
+  logout: () => call<{ ok: boolean }>('/api/account/logout', {}),
+  registerAffiliate: (b: object) => call<{ ok: boolean; code: string; status: string }>('/api/account/affiliate', b),
+  affMe: () => call<AffMe>('/api/aff/me'),
+  affOrders: () => call<AffOrder[]>('/api/aff/orders'),
+  withdraw: (amount: number) => call<{ ok: boolean }>('/api/aff/withdraw', { amount }),
   wards: (d: string) => call<{ items: GeoItem[] }>('/api/geo/wards?district=' + encodeURIComponent(d)).catch(() => ({ items: [] as GeoItem[] })),
 };
 

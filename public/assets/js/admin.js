@@ -750,6 +750,11 @@
           <div class="f s1" style="align-self:end"><button class="btn sm" id="testThuchi">Lưu & kiểm tra</button></div></div>
         <div id="intStatus" class="int-grid" style="margin-top:12px"><p class="muted">Đang kiểm tra trạng thái tích hợp…</p></div>
       </div>
+      <div class="card" id="sZalo"><h2>Zalo Mini App</h2>
+        <p class="muted small">Khoá bí mật (Secret Key) của Zalo App, lấy tại developers.zalo.me → ứng dụng → Thiết lập. Dùng để đổi token Zalo ra số điện thoại và vị trí khi khách đồng ý trong mini app, không bao giờ gửi ra trình duyệt.</p>
+        <div class="form"><div class="f s4"><label>Secret Key ${s.secrets.zalo_app_secret ? `(đang dùng ${esc(s.secrets.zalo_app_secret)})` : '(chưa có)'}</label><input id="kZalo" type="password" placeholder="Dán Secret Key" autocomplete="off" /></div>
+          <div class="f s2" style="align-self:end"><button class="btn sm" id="saveZalo">Lưu khoá</button></div></div>
+      </div>
       <div class="g2">
         <div class="card" id="sShop"><h2>Cửa hàng</h2>${form([{ k: 'name', l: 'Tên', s: 2 }, { k: 'legal_name', l: 'Tên pháp lý', s: 4 }, { k: 'slogan', l: 'Slogan' }, { k: 'hotline', l: 'Hotline', s: 2 }, { k: 'zalo', l: 'Zalo', s: 2 }, { k: 'email', l: 'Email', s: 2 }, { k: 'address', l: 'Địa chỉ' }, { k: 'facebook', l: 'Facebook', s: 3 }, { k: 'zalo_oa', l: 'Zalo OA', s: 3 }, { k: 'tiktok_shop', l: 'TikTok Shop', s: 3 }, { k: 'shopee_shop', l: 'Shopee', s: 3 }], shop)}</div>
         <div class="card" id="sPay"><h2>Thanh toán</h2>
@@ -811,6 +816,13 @@
       $('#oDist').addEventListener('change', (e) => fill($('#oWard'), '/api/geo/wards?district=' + e.target.value));
     }
 
+    $('#saveZalo').addEventListener('click', (e) => act(e.target, async () => {
+      const k = $('#kZalo').value.trim();
+      if (!k) return toast('Vui lòng dán Secret Key', true);
+      await api('/settings/secret', { method: 'POST', body: { key: 'zalo_app_secret', value: k } });
+      $('#kZalo').value = '';
+      toast('Đã lưu khoá Zalo App');
+    }));
     $('#testThuchi').addEventListener('click', (e) => act(e.target, async () => {
       const k = $('#kThuchi').value.trim();
       await saveAll(true);

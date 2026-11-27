@@ -13,14 +13,14 @@ export default function ProductPage() {
   const [qty, setQty] = useState(1);
   const p = catalog?.products.find((x) => x.slug === slug);
 
-  if (!catalog) return <Page className="page"><Header title="Sản phẩm" /><Loading /></Page>;
-  if (!p) return <Page className="page"><Header title="Sản phẩm" /><Empty icon="🔍" text="Sản phẩm không còn bán" /></Page>;
+  if (!catalog) return <Page className="page has-header"><Header title="Sản phẩm" /><Loading /></Page>;
+  if (!p) return <Page className="page has-header"><Header title="Sản phẩm" /><Empty icon="🔍" text="Sản phẩm không còn bán" /></Page>;
   const out = p.stock <= 0;
 
   const share = () => openShareSheet({ type: 'text', data: { text: `${p.name} · ${p.subtitle || ''} - ${vnd(p.effective_price)} tại DaLa` } }).catch(() => {});
 
   return (
-    <Page className="page has-bar">
+    <Page className="page has-header has-bar">
       <Header title={p.name} />
       <div className="pd-img"><img src={img(p.image)} alt={p.name} /></div>
       <div className="section">
