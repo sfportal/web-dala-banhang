@@ -21,11 +21,19 @@ export async function zaloName(): Promise<string> {
 }
 
 // Đăng nhập tài khoản khách DaLa bằng số điện thoại Zalo
+// Bản test (build với VITE_TEST_PHONE=1): không lấy được số thật thì đăng nhập bằng số điện thoại mẫu 0999999999
+export const TEST_PHONE_MODE = !!import.meta.env.VITE_TEST_PHONE;
+
 export async function loginWithPhone() {
-  const { token } = await getPhoneNumber({});
-  if (!token) throw new Error('Bạn chưa cho phép chia sẻ số điện thoại');
-  const access_token = await getAccessToken({});
-  return api.zaloLogin({ access_token, phone_token: token, name: await zaloName() });
+  try {
+    const { token } = await getPhoneNumber({});
+    if (!token) throw new Error('Bạn chưa cho phép chia sẻ số điện thoại');
+    const access_token = await getAccessToken({});
+    return await api.zaloLogin({ access_token, phone_token: token, name: await zaloName() });
+  } catch (e) {
+    if (TEST_PHONE_MODE) return api.zaloLogin({ test: true });
+    throw e;
+  }
 }
 
 export async function locate(): Promise<GeoAddress | null> {

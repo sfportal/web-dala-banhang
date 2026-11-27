@@ -3,7 +3,7 @@ import { Header, Page, useNavigate, useSnackbar } from 'zmp-ui';
 import { api, Destination, GeoAddress, GeoItem, groupLines, img, Quote, vnd } from '../api';
 import { useStore } from '../store';
 import { useZaloProfile } from '../components/welcome';
-import { askPermissions, matchPlace } from '../zalo';
+import { askPermissions, matchPlace, TEST_PHONE_MODE } from '../zalo';
 import { Empty, Loading } from '../components/ui';
 
 type Pay = 'cod' | 'sepay';
@@ -141,7 +141,7 @@ export default function CheckoutPage() {
 
   const fillFromZalo = async () => {
     const g = await askPermissions(['scope.userInfo', 'scope.userPhonenumber']);
-    if (g['scope.userPhonenumber']) await login();
+    if (g['scope.userPhonenumber'] || TEST_PHONE_MODE) await login();
     else openSnackbar({ text: 'Bạn chưa cho phép chia sẻ số điện thoại Zalo', type: 'warning' });
   };
 

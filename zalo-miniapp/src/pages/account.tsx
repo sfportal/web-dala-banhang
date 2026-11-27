@@ -5,7 +5,7 @@ import { AccountMe, AffMe, AffOrder, api, API_BASE, GeoItem, vnd, when } from '.
 import { useStore } from '../store';
 import { Loading } from '../components/ui';
 import { openPage, useZaloProfile } from '../components/welcome';
-import { askPermissions } from '../zalo';
+import { askPermissions, TEST_PHONE_MODE } from '../zalo';
 
 const APP_ID = import.meta.env.VITE_APP_ID || '430626676807016551';
 const BANKS = ['Vietcombank', 'VietinBank', 'BIDV', 'Agribank', 'MB Bank', 'Techcombank', 'ACB', 'VPBank', 'TPBank', 'Sacombank', 'VIB', 'HDBank', 'SHB', 'OCB', 'MSB', 'SeABank', 'Eximbank', 'LPBank', 'Nam A Bank', 'Bac A Bank'];
@@ -143,7 +143,7 @@ export default function AccountPage() {
   const signIn = async () => {
     setBusy(true);
     const g = await askPermissions(['scope.userInfo', 'scope.userPhonenumber']);
-    if (g['scope.userPhonenumber']) await login();
+    if (g['scope.userPhonenumber'] || TEST_PHONE_MODE) await login();
     setBusy(false);
   };
   const signOut = async () => { await api.logout().catch(() => {}); setSession(''); };

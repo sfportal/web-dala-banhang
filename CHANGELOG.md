@@ -3,6 +3,9 @@
 Mỗi lần gộp vào `main`, website tự deploy. Khi tăng `version` trong `package.json` và thêm mục tương ứng ở đây, lần deploy đó tự tạo bản phát hành `v<phiên bản>` trên GitHub.
 Quy ước: tính năng mới tăng số giữa (1.4.0 → 1.5.0), sửa lỗi tăng số cuối (1.5.0 → 1.5.1).
 
+## 1.10.1 – 27/11/2026
+- Bản test của Zalo Mini App (build với `VITE_TEST_PHONE=1`) đăng nhập bằng số điện thoại mẫu 0999999999 khi chưa lấy được số Zalo thật, để thử tài khoản, cộng tác viên và điền sẵn thông tin.
+
 ## 1.10.0 – 27/11/2026
 - Zalo Mini App: màn hình chào lần đầu để khách đồng ý điều khoản, rồi xin quyền tên, số điện thoại và vị trí Zalo (khách có thể từ chối).
 - Đăng nhập tài khoản khách bằng số điện thoại Zalo, không cần mật khẩu hay OTP; tự điền họ tên, số điện thoại khi đặt hàng.

@@ -4,7 +4,7 @@ import { openWebview } from 'zmp-sdk/apis';
 import { useSnackbar } from 'zmp-ui';
 import { API_BASE } from '../api';
 import { useStore } from '../store';
-import { askPermissions, locate, loginWithPhone } from '../zalo';
+import { askPermissions, locate, loginWithPhone, TEST_PHONE_MODE } from '../zalo';
 import logo from '../logo.png';
 
 export const openPage = (path: string) => openWebview({ url: API_BASE + path }).catch(() => { window.open(API_BASE + path, '_blank'); });
@@ -18,7 +18,7 @@ export function useZaloProfile() {
       const d = await loginWithPhone();
       setSession(d.token);
       setCustomer({ ...customer, name: customer.name || d.customer.name || '', phone: d.customer.phone });
-      if (!silent) openSnackbar({ text: 'Đã đăng nhập bằng số Zalo ' + d.customer.phone, type: 'success' });
+      if (!silent || TEST_PHONE_MODE) openSnackbar({ text: (d.customer.phone === '0999999999' ? 'Bản test: dùng số điện thoại mẫu ' : 'Đã đăng nhập bằng số Zalo ') + d.customer.phone, type: 'success' });
       return true;
     } catch (e: any) {
       if (!silent) openSnackbar({ text: e?.message || 'Chưa lấy được số điện thoại Zalo', type: 'warning' });
@@ -51,7 +51,7 @@ export function Welcome() {
     setBusy(true);
     acceptConsent();
     const g = await askPermissions(['scope.userInfo', 'scope.userPhonenumber', 'scope.userLocation']);
-    await Promise.all([g['scope.userPhonenumber'] ? login(true) : null, g['scope.userLocation'] ? findMe(true) : null]);
+    await Promise.all([g['scope.userPhonenumber'] || TEST_PHONE_MODE ? login(true) : null, g['scope.userLocation'] ? findMe(true) : null]);
     setBusy(false);
   };
 
