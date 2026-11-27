@@ -7,7 +7,7 @@ export const run = (env, sql, ...args) => env.DB.prepare(sql).bind(...args).run(
 export const stmt = (env, sql, ...args) => env.DB.prepare(sql).bind(...args);
 
 // Khoá bí mật lưu trong settings với tiền tố "secret:", không bao giờ trả ra trình duyệt
-export const SECRET_KEYS = ['secret:thuchi_api_key'];
+export const SECRET_KEYS = ['secret:thuchi_api_key', 'secret:zalo_app_secret'];
 
 export async function getSettings(env) {
   const rows = await all(env, "SELECT key, value FROM settings WHERE key NOT LIKE 'secret:%'");

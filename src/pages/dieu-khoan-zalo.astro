@@ -11,22 +11,26 @@ const h2 = 'font-size:1.5rem;margin-top:30px';
     <p>Zalo Mini App "DaLa" do Hợp tác xã DaLa vận hành, cho phép khách xem sản phẩm, đặt hàng và theo dõi đơn ngay trong Zalo. Mini app dùng chung sản phẩm, giá, đơn hàng và <a href="/chinh-sach">chính sách mua hàng</a> với website DaLa. Khi dùng mini app, bạn đồng ý với các điều khoản dưới đây.</p>
 
     <h2 id="quyen" style={h2}>Quyền mini app yêu cầu</h2>
-    <p><b>Thông tin cơ bản Zalo (tên, ảnh đại diện).</b> Chỉ xin khi bạn bấm "Dùng tên Zalo" ở bước thanh toán, để điền sẵn họ tên người nhận. Bạn có thể từ chối và tự nhập tên.</p>
+    <p>Lần đầu mở mini app, bạn đọc và đồng ý điều khoản này, sau đó Zalo hỏi bạn cấp từng quyền dưới đây. Bạn có thể từ chối bất kỳ quyền nào mà vẫn mua hàng bình thường bằng cách tự nhập thông tin.</p>
+    <p><b>Thông tin cơ bản Zalo (tên, ảnh đại diện).</b> Dùng để điền sẵn họ tên người nhận và hiển thị trong trang Tài khoản.</p>
+    <p><b>Số điện thoại Zalo.</b> Dùng để điền sẵn số điện thoại nhận hàng và đăng nhập tài khoản khách DaLa (xem đơn đã mua, điểm tích luỹ, đăng ký và theo dõi hoa hồng cộng tác viên) mà không cần mật khẩu hay mã OTP.</p>
+    <p><b>Vị trí hiện tại.</b> Chỉ dùng một lần khi bạn đồng ý hoặc bấm "Dùng vị trí hiện tại", để điền sẵn tỉnh/thành, quận/huyện, phường/xã giao hàng và tính phí giao. DaLa không lưu toạ độ của bạn; toạ độ được gửi tới dịch vụ bản đồ OpenStreetMap để tra tên địa chỉ.</p>
     <p><b>Lưu ảnh vào thư viện.</b> Chỉ dùng khi bạn bấm "Lưu mã QR vào máy" để lưu mã VietQR thanh toán.</p>
-    <p><b>Mở chat OA, gọi điện, quan tâm OA.</b> Chỉ khi bạn bấm các nút hỗ trợ tương ứng.</p>
-    <p>Mini app không truy cập vị trí, danh bạ, camera hay số điện thoại Zalo của bạn.</p>
+    <p><b>Chia sẻ, mở chat OA, gọi điện, quan tâm OA.</b> Chỉ khi bạn bấm các nút tương ứng (ví dụ chia sẻ link giới thiệu cộng tác viên).</p>
+    <p>Mini app không truy cập danh bạ, camera hay micro của bạn.</p>
 
     <h2 id="du-lieu" style={h2}>Dữ liệu DaLa thu thập và mục đích</h2>
-    <p>Khi đặt hàng, bạn nhập họ tên, số điện thoại, địa chỉ nhận hàng và ghi chú. DaLa dùng các thông tin này để xử lý và giao đơn, thu tiền COD hoặc đối soát chuyển khoản, chăm sóc sau bán và tích điểm khách hàng, giống đơn đặt trên website.</p>
-    <p>Dữ liệu được chia sẻ cho hãng vận chuyển (qua Goship) và cổng đối soát thanh toán (SePay) ở mức cần thiết để giao hàng và xác nhận thanh toán. DaLa không bán hay chia sẻ dữ liệu cho bên thứ ba vì mục đích quảng cáo.</p>
-    <p><b>Lưu trên điện thoại.</b> Giỏ hàng, danh sách đơn đã đặt và thông tin người nhận gần nhất được lưu trong bộ nhớ của mini app trên máy bạn để lần sau mua nhanh hơn. Xoá mini app khỏi Zalo sẽ xoá các dữ liệu này.</p>
+    <p>Khi đặt hàng, bạn nhập hoặc xác nhận họ tên, số điện thoại, địa chỉ nhận hàng và ghi chú. DaLa dùng các thông tin này để xử lý và giao đơn, thu tiền COD hoặc đối soát chuyển khoản, chăm sóc sau bán và tích điểm khách hàng, giống đơn đặt trên website.</p>
+    <p>Khi đăng nhập bằng số điện thoại Zalo, DaLa tạo hoặc dùng lại tài khoản khách gắn với số điện thoại đó. Khi đăng ký cộng tác viên, bạn cung cấp thêm họ tên theo CCCD, ngày sinh, số CCCD, địa chỉ, tài khoản ngân hàng và mã số thuế cá nhân; các thông tin này chỉ dùng để chi trả hoa hồng và thực hiện nghĩa vụ thuế theo <a href="/chinh-sach#ctv">chính sách cộng tác viên</a>.</p>
+    <p>Dữ liệu được chia sẻ cho hãng vận chuyển (qua Goship), cổng đối soát thanh toán (SePay), ngân hàng và cơ quan thuế ở mức cần thiết. DaLa không bán hay chia sẻ dữ liệu cho bên thứ ba vì mục đích quảng cáo.</p>
+    <p><b>Lưu trên điện thoại.</b> Giỏ hàng, danh sách đơn đã đặt, thông tin người nhận gần nhất, phiên đăng nhập và mã giới thiệu cộng tác viên được lưu trong bộ nhớ của mini app trên máy bạn. Đăng xuất hoặc xoá mini app khỏi Zalo sẽ xoá các dữ liệu này.</p>
     <p>DaLa không lưu mã định danh Zalo của bạn trên máy chủ.</p>
 
     <h2 id="xoa-du-lieu" style={h2}>Rút lại đồng ý và xoá dữ liệu</h2>
-    <p>Bạn có thể thu hồi quyền đã cấp cho mini app trong phần cài đặt của Zalo bất cứ lúc nào. Khi nhận được yêu cầu rút lại đồng ý hoặc xoá dữ liệu từ Zalo, hoặc yêu cầu gửi qua trang <a href="/lien-he?chu-de=khac">Liên hệ</a>, DaLa xử lý trong vòng 7 ngày làm việc: xoá hoặc ẩn danh thông tin cá nhân gắn với số điện thoại của bạn, trừ dữ liệu phải lưu theo quy định về kế toán và thuế đối với đơn đã giao.</p>
+    <p>Bạn có thể thu hồi quyền đã cấp cho mini app trong phần cài đặt của Zalo bất cứ lúc nào. Khi nhận được yêu cầu rút lại đồng ý hoặc xoá dữ liệu từ Zalo, hoặc yêu cầu gửi qua trang <a href="/lien-he?chu-de=khac">Liên hệ</a>, DaLa xử lý trong vòng 7 ngày làm việc: xoá hoặc ẩn danh thông tin cá nhân và tài khoản gắn với số điện thoại của bạn, trừ dữ liệu phải lưu theo quy định về kế toán và thuế đối với đơn đã giao.</p>
 
-    <h2 id="mua-hang" style={h2}>Đặt hàng và thanh toán</h2>
-    <p>Giá, khuyến mãi, Flash Sale và phí giao hàng hiển thị trong mini app là giá áp dụng tại thời điểm đặt. Thanh toán bằng tiền mặt khi nhận hàng (COD) hoặc chuyển khoản VietQR; đơn chuyển khoản chưa thanh toán sẽ tự huỷ sau thời gian giữ chỗ. Giao hàng và đổi trả theo <a href="/chinh-sach">chính sách mua hàng DaLa</a>.</p>
+    <h2 id="mua-hang" style={h2}>Đặt hàng, Flash Sale và thanh toán</h2>
+    <p>Giá, khuyến mãi và phí giao hàng hiển thị trong mini app là giá áp dụng tại thời điểm đặt. Suất Flash Sale có hạn, mỗi đơn có thể bị giới hạn số suất; hết suất hoặc hết giờ thì về giá thường. Thanh toán bằng tiền mặt khi nhận hàng (COD) hoặc chuyển khoản VietQR; đơn chuyển khoản chưa thanh toán sẽ tự huỷ sau thời gian giữ chỗ. Giao hàng và đổi trả theo <a href="/chinh-sach">chính sách mua hàng DaLa</a>.</p>
 
     <h2 id="lien-he" style={h2}>Liên hệ</h2>
     <p>Mọi thắc mắc về điều khoản hoặc dữ liệu cá nhân, vui lòng gửi qua trang <a href="/lien-he">Liên hệ</a> của DaLa.</p>

@@ -44,8 +44,8 @@ export default function OrderPage() {
     .then(() => openSnackbar({ text: 'Đã lưu mã QR vào thư viện ảnh', type: 'success' }))
     .catch(() => openSnackbar({ text: 'Chưa lưu được ảnh, hãy chụp màn hình', type: 'warning' }));
 
-  if (err && !o) return <Page className="page"><Header title={`Đơn ${code}`} /><Empty icon="⚠️" text={err}><button className="btn" onClick={() => navigate('/')}>Về cửa hàng</button></Empty></Page>;
-  if (!o) return <Page className="page"><Header title={`Đơn ${code}`} /><Loading /></Page>;
+  if (err && !o) return <Page className="page has-header"><Header title={`Đơn ${code}`} /><Empty icon="⚠️" text={err}><button className="btn" onClick={() => navigate('/')}>Về cửa hàng</button></Empty></Page>;
+  if (!o) return <Page className="page has-header"><Header title={`Đơn ${code}`} /><Loading /></Page>;
 
   const paid = o.payment_status === 'paid';
   const cancelled = o.status === 'cancelled' || o.status === 'returned';
@@ -54,7 +54,7 @@ export default function OrderPage() {
   const idx = STEPS.findIndex((s) => s[0] === o.status);
 
   return (
-    <Page className="page">
+    <Page className="page has-header">
       <Header title={`Đơn ${o.code}`} />
       <div className="section center">
         {cancelled ? (

@@ -43,12 +43,24 @@ export default function HomePage() {
         <input placeholder="Tìm sản phẩm" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
 
-      {catalog?.flash && flashItems.length > 0 && (
-        <div className="flash-bar">
-          <b>⚡ {catalog.flash.name}</b>
-          <span>Kết thúc sau <Countdown to={catalog.flash.ends_at} /></span>
+      {catalog?.flash && flashItems.length > 0 ? (
+        <>
+          <div className="flash-bar" onClick={() => navigate('/flash-sale')}>
+            <b>⚡ {catalog.flash.name}</b>
+            <span>Kết thúc sau <Countdown to={catalog.flash.ends_at} /> ›</span>
+          </div>
+          <div className="flash-strip">
+            {flashItems.map((p) => (
+              <ProductCard key={p.sku} p={p} onOpen={() => navigate('/san-pham/' + p.slug)} onAdd={() => addToCart(p.sku, p.name)} />
+            ))}
+          </div>
+        </>
+      ) : catalog?.next_flash ? (
+        <div className="flash-bar" onClick={() => navigate('/flash-sale')}>
+          <b>⚡ Flash Sale sắp bắt đầu</b>
+          <span>Còn <Countdown to={catalog.next_flash.starts_at} /> ›</span>
         </div>
-      )}
+      ) : null}
 
       <div className="chips">
         {LINES.map(([k, label]) => (
