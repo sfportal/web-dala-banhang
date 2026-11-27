@@ -18,6 +18,7 @@ import { accountApi, linkedAffiliate } from './account.js';
 import { sendOtp, otpConfig } from '../lib/otp.js';
 import { adjustPoints } from '../lib/loyalty.js';
 import { refreshOrderShipment } from '../lib/shiptrack.js';
+import { CORS_PATHS, corsOrigin, withCors } from '../lib/cors.js';
 
 
 // Khoá ký link đơn hàng: ưu tiên secret APP_SECRET, nếu không có thì tự sinh một lần và lưu trong D1
@@ -51,6 +52,13 @@ const ROLE_RANK = { viewer: 1, ops: 2, admin: 3 };
 export async function handleApi(request, env, ctx) {
   const url = new URL(request.url);
   const p = url.pathname.replace(/\/+$/, '');
+  const origin = CORS_PATHS.test(p) ? corsOrigin(request.headers.get('origin')) : null;
+  if (request.method === 'OPTIONS') return origin ? withCors(new Response(null, { status: 204 }), origin) : new Response(null, { status: 204 });
+  const res = await routeApi(request, env, ctx, url, p);
+  return origin ? withCors(res, origin) : res;
+}
+
+async function routeApi(request, env, ctx, url, p) {
   const m = request.method;
   try {
     if (p.startsWith('/api/admin')) return await adminApi(request, env, url, p.slice('/api/admin'.length) || '/', m);
@@ -86,7 +94,8 @@ async function publicApi(request, env, url, p, m, ctx) {
   if (p === '/api/checkout' && m === 'POST') {
     const b = await withCustomer(env, request, await readBody(request));
     if (b.website) throw new HttpError(400, 'Không hợp lệ'); // bẫy bot
-    const { order } = await checkout(env, b, { sid: b.sid, utm_source: b.utm?.source, utm_medium: b.utm?.medium, utm_campaign: b.utm?.campaign });
+    const { order } = await checkout(env, b, { sid: b.sid, utm_source: b.utm?.source, utm_medium: b.utm?.medium, utm_campaign: b.utm?.campaign,
+      channel: b.channel === 'zalo' ? 'zalo' : null });
     return json({ code: order.code, token: await orderToken(env, order.code), total: order.total, payment_method: order.payment_method });
   }
 
