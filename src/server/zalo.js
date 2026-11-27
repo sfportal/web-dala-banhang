@@ -6,6 +6,7 @@ import { HttpError, json, readBody, normPhone, validPhone, hashPassword, randomT
 import { createSessionToken } from '../lib/session.js';
 
 const GRAPH = 'https://graph.zalo.me/v2.0/me';
+export const TEST_PHONE = '0999999999';
 
 async function graphDecode(env, accessToken, code) {
   const secret = await getSecret(env, 'zalo_app_secret', 'ZALO_APP_SECRET');
@@ -47,10 +48,12 @@ export async function reverseGeocode(lat, lng) {
 export async function zaloApi(request, env, p, m) {
   if (p === '/api/zalo/login' && m === 'POST') {
     const b = await readBody(request);
-    const info = await graphDecode(env, b.access_token, b.phone_token);
+    // Bản test của mini app: đăng nhập bằng số điện thoại mẫu, không gọi Zalo. Chỉ vào được đúng tài khoản mẫu này.
+    const test = b.test === true;
+    const info = test ? { number: TEST_PHONE } : await graphDecode(env, b.access_token, b.phone_token);
     const phone = normPhone(info.number);
     if (!validPhone(phone)) throw new HttpError(400, 'Không lấy được số điện thoại Zalo');
-    const name = (await zaloName(b.access_token)) || String(b.name || '').trim().slice(0, 80) || null;
+    const name = test ? 'Khách thử Zalo' : (await zaloName(b.access_token)) || String(b.name || '').trim().slice(0, 80) || null;
     let c = await first(env, 'SELECT * FROM customers WHERE phone=?', phone);
     if (!c) {
       // Mật khẩu ngẫu nhiên: khách đăng nhập website bằng "Quên mật khẩu" (OTP) nếu cần

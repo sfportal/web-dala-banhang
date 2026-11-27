@@ -73,7 +73,7 @@ export const api = {
   order: (code: string, token: string, check = false) => call<Order>(`/api/orders/${code}?t=${encodeURIComponent(token)}${check ? '&check=1' : ''}`),
   cities: () => call<{ source: string; items: GeoItem[] }>('/api/geo/cities').catch(() => ({ source: 'static', items: [] as GeoItem[] })),
   districts: (city: string) => call<{ items: GeoItem[] }>('/api/geo/districts?city=' + encodeURIComponent(city)).catch(() => ({ items: [] as GeoItem[] })),
-  zaloLogin: (b: { access_token: string; phone_token: string; name?: string }) => call<{ token: string; customer: { name: string | null; phone: string } }>('/api/zalo/login', b),
+  zaloLogin: (b: { access_token?: string; phone_token?: string; name?: string; test?: boolean }) => call<{ token: string; customer: { name: string | null; phone: string } }>('/api/zalo/login', b),
   zaloLocation: (b: { access_token: string; location_token: string }) => call<{ lat: number; lng: number; address: GeoAddress | null }>('/api/zalo/location', b),
   me: () => call<AccountMe>('/api/account/me'),
   logout: () => call<{ ok: boolean }>('/api/account/logout', {}),
