@@ -116,7 +116,7 @@ export async function checkout(env, b, meta = {}) {
       subtotal, discount, shipping_fee, total, voucher_code, affiliate_id, ref_source, payment_method, shipping_carrier, shipping_service, shipping_rate_id, shipping_expected,
       shipping_cost, shop_pays_ship, parcel_weight, parcel_dims, fragile, utm_source, utm_medium, utm_campaign, session_id, points_used, points_discount, eta_from, eta_to)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-  code, aff ? 'ctv' : 'web', customerId, name, phone, b.email || null, address, to.province || to.city_name || null, to.city || null, to.district || null, to.ward || null,
+  code, aff ? 'ctv' : (meta.channel || 'web'), customerId, name, phone, b.email || null, address, to.province || to.city_name || null, to.city || null, to.district || null, to.ward || null,
   to.district_name || null, to.ward_name || null, String(b.note || '').slice(0, 500) || null,
   q.subtotal, q.discount + (q.points_discount || 0), q.shipping.fee, q.total, q.voucher, aff?.id || null, q.ref_source, method,
   sel?.carrier || null, sel?.service || null, sel?.id || null, sel?.expected || null, q.shipping.carrier_fee || null, q.shipping.shop_pays ? 1 : 0,

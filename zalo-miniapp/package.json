@@ -1,0 +1,30 @@
+{
+  "name": "dala-zalo-miniapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zalo Mini App cửa hàng DaLa, dùng chung API và dữ liệu với website dala-shop",
+  "scripts": {
+    "start": "zmp start",
+    "dev": "vite",
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "login": "zmp login",
+    "deploy": "zmp deploy"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zmp-sdk": "^2.54.0",
+    "zmp-ui": "^1.11.15-2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.32",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "zmp-cli": "^4.0.7",
+    "zmp-vite-plugin": "^1.1.6"
+  }
+}
